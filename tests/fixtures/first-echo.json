@@ -1,0 +1,13 @@
+{
+  "name": "First Echo causal history",
+  "steps": [
+    {"at": [12,10], "command": "interact"},
+    {"at": [21,9], "command": "interact"},
+    {"at": [28,12], "command": "interact"},
+    {"at": [23,5], "command": "interact"},
+    {"at": [25,9], "command": "attack", "repeat": 4},
+    {"at": [30,15], "command": "attack", "repeat": 4},
+    {"at": [12,10], "command": "interact"}
+  ],
+  "expected": {"quest":"complete", "victories":2, "dewleaf":0, "shard":0, "bladeInstances":1}
+}

@@ -1,0 +1,19 @@
+{
+  "name": "living-world",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0 <23"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test",
+    "backup": "node scripts/backup.js",
+    "steward:status": "node scripts/steward-status.js",
+    "steward:once": "node scripts/steward-status.js --once"
+  },
+  "dependencies": {
+    "ws": "8.22.0"
+  }
+}

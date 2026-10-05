@@ -1,0 +1,8 @@
+{
+  "provider": "openai",
+  "model": null,
+  "dailyBudgetUsd": null,
+  "modelCallsEnabled": false,
+  "mode": "local-memory-worker",
+  "note": "Provider chosen by owner. Model and daily budget pending. No API key belongs in this file."
+}
