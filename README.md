@@ -2,6 +2,8 @@
 
 Persistent local 2D RPG foundation. Read [the baseline plan](docs/BASELINE.md) for the concept and current milestones, and [the researched autonomy architecture](docs/AUTONOMY.md) for the complete learning, development, creative and operating plan.
 
+The [day one quality requirements](docs/DAY_ONE.md) define the stricter evidence, compatibility, evaluation and recovery gates for each autonomous capability.
+
 ## Windows localhost
 Requires Node.js 22.18 or later in the 22.x line. The current machine has 22.23.3.
 

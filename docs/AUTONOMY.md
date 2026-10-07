@@ -2,6 +2,8 @@
 
 Research and proposed architecture, 7 October 2026. This is a build specification, not a description of systems already running. The protected identity remains in [CONSTITUTION.md](CONSTITUTION.md); current implementation is described in [BASELINE.md](BASELINE.md), [MEMORY.md](MEMORY.md) and [ADMIN.md](ADMIN.md).
 
+[DAY_ONE.md](DAY_ONE.md) strengthens this architecture with evidence coverage, transactional command receipts, version compatibility, repeated evaluation, creative diversity and explicit capability gates. It also records two characterization findings in the current seed. Use both documents for the next implementation package.
+
 ## The decision
 
 The Observatory is necessary, but insufficient. It gives the owner access to records and controls; it does not yet give the world an independent developer, artist or operator. Connecting a model to those records would produce an assistant with tools. To produce the intended steward, we need a complete cycle that chooses useful work, tests its assumptions, finishes changes, recovers from failure and remembers what actually helped.
@@ -282,7 +284,7 @@ Useful service boundaries are `observe`, `retrieveEvidence`, `selectGoal`, `rese
 
 Build through complete vertical slices. Each phase should demonstrate a closed cycle, rather than collecting disconnected modules.
 
-1. **Durable learning and metered shadow work.** Add goal/attempt/experiment/lesson records, renewable jobs, a provider broker, atomic budget tests and Observatory evidence views. Begin with a mock provider and disabled live inference. Demonstrate recovery across restart, uncertain charges, memory correction and a negative experiment. This is the next implementation package.
+1. **Durable learning and metered shadow work.** Add goal/attempt/experiment/lesson records, versioned evidence packets with coverage, renewable/cancellable jobs, a provider broker, atomic budget tests, command/proposal receipts and Observatory evidence views. Begin with a mock provider and disabled live inference. Demonstrate recovery across restart, uncertain charges, duplicate/conflicting commands, memory correction and a negative experiment. The stricter contracts and acceptance gates are in DAY_ONE.md. This is the next implementation package.
 2. **One real World Intelligence cycle.** With explicit inference activation inside saved owner limits, interpret bounded histories and generate shadow proposals. Then apply one compatible skill and one personal quest through validated effects. Exercise refusal, duplicate delivery, stale state, reward limits and provenance. Record actual outcomes rather than declaring generation an improvement.
 3. **Isolated development and creative cycle.** Establish a tested OS boundary, world copies, browser inspection and artifact packaging. Complete one self-selected code improvement and one visual improvement; inspect rendered output and retain failed variants. Generation adapters remain optional until separately authorized.
 4. **Independent release and operator cycle.** Implement protected promotion, migration compatibility, complete emergency stop, process supervision and incident runbooks. Deliberately break a candidate and a release. Verify recovery without erasing newly earned progress, then let the steward diagnose and retry.

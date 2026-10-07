@@ -80,6 +80,8 @@ The owner dashboard and encrypted OpenAI configuration/catalog check are impleme
 
 [AUTONOMY.md](AUTONOMY.md) audits the implemented foundation and specifies the remaining memory, learning, orchestration, simulation, developer, visual, release and operating systems. Its build order starts with durable learning records and metered shadow work, then proves complete content, code, art and recovery cycles. It is proposed architecture, not a claim that those capabilities have been implemented.
 
+[DAY_ONE.md](DAY_ONE.md) adds the capability acceptance gates and contracts for evidence coverage, retry-safe mutations, compatible world versions, repeated evaluation, creative diversity and recovery. These remain implementation requirements, not passed checks.
+
 ## Technology references
 - Node 22 SQLite API: https://nodejs.org/download/release/latest-jod/docs/api/sqlite.html (experimental in this baseline runtime; pin and test upgrades).
 - WebSocket library: https://www.npmjs.com/package/ws
