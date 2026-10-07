@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 export function migrate(db) {
   const version = db.prepare('PRAGMA user_version').get().user_version;
   if (version > SCHEMA_VERSION) throw new Error('Database is newer than this release; refusing to downgrade it.');
@@ -44,6 +44,15 @@ export function migrate(db) {
         id TEXT PRIMARY KEY, unique_key TEXT NOT NULL UNIQUE, category TEXT NOT NULL, title TEXT NOT NULL,
         evidence TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'proposed', created_at INTEGER NOT NULL
       );
+    `);
+    if (version < 4) db.exec(`
+      CREATE TABLE owner_tickets(hash TEXT PRIMARY KEY,expires_at INTEGER NOT NULL,used_at INTEGER);
+      CREATE TABLE owner_sessions(hash TEXT PRIMARY KEY,csrf TEXT NOT NULL,expires_at INTEGER NOT NULL);
+      CREATE TABLE owner_settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+      CREATE TABLE owner_secrets(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+      CREATE TABLE admin_audit(id INTEGER PRIMARY KEY,action TEXT NOT NULL,details TEXT NOT NULL,at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+      CREATE TRIGGER audit_no_update BEFORE UPDATE ON admin_audit BEGIN SELECT RAISE(ABORT,'Audit is append-only'); END;
+      CREATE TRIGGER audit_no_delete BEFORE DELETE ON admin_audit BEGIN SELECT RAISE(ABORT,'Audit is append-only'); END;
     `);
     db.exec(`PRAGMA user_version=${SCHEMA_VERSION}; COMMIT;`);
   } catch (error) { db.exec('ROLLBACK'); throw error; }

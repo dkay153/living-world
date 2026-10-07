@@ -1,9 +1,9 @@
 # World memory and background work
 
 ## Running now
-The server records authoritative events, item provenance and observed knowledge in schema version 3. An integrated local worker wakes every two seconds, summarizes changed player histories and inspects the world once per minute. It uses durable jobs and event checkpoints; it needs no API key and makes no network/model calls.
+The server records authoritative events, item provenance and observed knowledge. Schema version 4 adds owner sessions, configuration, encrypted credentials and audit records to the version-3 history substrate. An integrated local worker wakes every two seconds, summarizes changed player histories and inspects the world once per minute. It uses durable jobs and event checkpoints; it needs no API key and makes no network/model calls. The owner can pause/resume it through the Observatory; pause persists across restarts.
 
-The owner selected OpenAI. `config/intelligence.json` records that decision, with model, budget and activation still unset. This file is a declaration for future provider wiring, not an active OpenAI adapter. No model selection, hidden inference or paid call is made by this milestone. Future structured proposals will follow [official Structured Outputs documentation](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses), with local validation before applying changes.
+The owner selected OpenAI. `config/intelligence.json` records the initial decision; actual owner configuration is now stored in `owner_settings` and managed through the [Observatory](ADMIN.md). Model and daily budget remain unset until the owner supplies them. Credentials can be stored encrypted and explicitly checked against the model catalog. Inference is not implemented and cannot be enabled by saving settings. No model selection, hidden inference or paid call is made by this milestone. Future structured proposals will follow [official Structured Outputs documentation](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses), with local validation before applying changes.
 
 ## History and provenance
 - Events include schema version, kind, subject and supporting payload. Gameplay events in a single action share an action ID and location.

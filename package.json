@@ -1,6 +1,6 @@
 {
   "name": "living-world",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -11,7 +11,9 @@
     "test": "node --test",
     "backup": "node scripts/backup.js",
     "steward:status": "node scripts/steward-status.js",
-    "steward:once": "node scripts/steward-status.js --once"
+    "steward:once": "node scripts/steward-status.js --once",
+    "admin:open": "node scripts/admin-open.js",
+    "admin:prepare": "node scripts/admin-open.js --prepare"
   },
   "dependencies": {
     "ws": "8.22.0"

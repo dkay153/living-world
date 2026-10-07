@@ -8,17 +8,23 @@ import { WIDTH, HEIGHT, objects, tile, destination } from './world.js';
 import { createGame } from './game.js';
 import { createSteward } from './steward.js';
 import { personalJournal } from './memory.js';
+import { createAdmin } from './admin.js';
+import { SCHEMA_VERSION } from './migrations.js';
 const host=process.env.HOST || '127.0.0.1', port=Number(process.env.PORT || 3000);
-const store=openStore(resolve(process.env.DATA_DIR || 'data','world.sqlite'));
+const dataDir=resolve(process.env.DATA_DIR || 'data');
+const store=openStore(resolve(dataDir,'world.sqlite'));
 const game=createGame(store);
 const steward=createSteward(store);
 const sessions=new Map(), peers=new Map();
+const admin=createAdmin({store,steward,dataDir,backupDir:resolve(process.env.BACKUP_DIR||'backups'),online:()=>peers.size});
 const publicFiles={'/':['index.html','text/html'], '/style.css':['style.css','text/css'], '/seed.js':['seed.js','text/javascript']};
 const server=http.createServer(async(req,res)=>{
   res.setHeader('X-Content-Type-Options','nosniff');
   res.setHeader('Content-Security-Policy',"default-src 'self'; connect-src 'self'; style-src 'self'; script-src 'self'; frame-ancestors 'none'");
   res.setHeader('Cache-Control','no-store');
-  if(req.url==='/healthz') { res.writeHead(200,{'Content-Type':'application/json'}); return res.end(JSON.stringify({ok:store.db.prepare('SELECT 1').get()!=null,version:'0.2.0',schemaVersion:3,memoryWorker:'enabled',modelCallsEnabled:false})); }
+  res.setHeader('Referrer-Policy','no-referrer');
+  if(await admin.handle(req,res))return;
+  if(req.url==='/healthz') { res.writeHead(200,{'Content-Type':'application/json'}); return res.end(JSON.stringify({ok:store.db.prepare('SELECT 1').get()!=null,version:'0.3.0',schemaVersion:SCHEMA_VERSION,memoryWorker:steward.status().paused?'paused':'enabled',modelCallsEnabled:false})); }
   const file=publicFiles[req.url];
   if(!file || req.method!=='GET'){res.writeHead(404);return res.end('Not found');}
   try { const data=await readFile(new URL('../public/'+file[0],import.meta.url)); res.writeHead(200,{'Content-Type':file[1]});res.end(data); }

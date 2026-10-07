@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { createQueue } from './jobs.js';
 import { saveMemory } from './memory.js';
+import { settings } from './owner-settings.js';
 export function createSteward(store,clock=Date.now) {
   const queue=createQueue(store.db,clock);
+  const control=settings(store.db);
   function schedule() {
     store.db.exec('BEGIN IMMEDIATE');
     try{
@@ -19,6 +21,7 @@ export function createSteward(store,clock=Date.now) {
     return {version:1,throughEvent:store.db.prepare('SELECT MAX(id) AS id FROM events').get().id||0,defeatsObserved:defeats.length};
   }
   function tick() {
+    if(control.get('workerPaused',false))return;
     schedule();
     const slot=Math.floor(clock()/60000);queue.enqueue('inspect_world',{},`inspection:${slot}`);
     // Local deterministic handlers only. A model-backed developer is not running yet.
@@ -31,6 +34,6 @@ export function createSteward(store,clock=Date.now) {
       }catch(e){store.db.exec('ROLLBACK');queue.fail(job,e.message);}
     }
   }
-  function status(){return {mode:'local-memory-worker',provider:'openai',modelCallsEnabled:false,jobs:queue.status(),proposals:store.db.prepare('SELECT category,title,status FROM improvements ORDER BY created_at DESC LIMIT 10').all()};}
+  function status(){return {mode:'local-memory-worker',provider:'openai',modelCallsEnabled:false,paused:control.get('workerPaused',false),jobs:queue.status(),proposals:store.db.prepare('SELECT category,title,status FROM improvements ORDER BY created_at DESC LIMIT 10').all()};}
   return {tick,status,queue};
 }
