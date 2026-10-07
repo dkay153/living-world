@@ -1,6 +1,6 @@
 # Living World
 
-Persistent local 2D RPG foundation. Read [the baseline plan](docs/BASELINE.md) for the complete concept, architecture, milestones and launch gates.
+Persistent local 2D RPG foundation. Read [the baseline plan](docs/BASELINE.md) for the concept and current milestones, and [the researched autonomy architecture](docs/AUTONOMY.md) for the complete learning, development, creative and operating plan.
 
 ## Windows localhost
 Requires Node.js 22.18 or later in the 22.x line. The current machine has 22.23.3.
@@ -24,7 +24,7 @@ Open http://127.0.0.1:3000. Move with WASD/arrows; E interacts, Space begins a t
 
 Implemented: camera-following exploration, original code-drawn animated sprites, gathering, inventory, shared overworld creatures, separate turn-based encounter screens, healing, defeat/recovery, NPC dialogue, one quest and durable chronicle. Battles offer Strike, Guard, Dewleaf and Retreat. Entering an encounter costs no turn; valid combat actions are followed by the enemy turn. Encounters persist across reconnects; movement is blocked until they end. Encounters are per traveler; multiple travelers already in encounters resolve their own battles, while victory removes the overworld creature until respawn. Creatures do not chase independently. This initial playable seed still needs content tuning and playtesting to meet the 15-minute adventure goal. World Intelligence is not connected. This is a foundation sandbox, not the complete game.
 
-World memory now records versioned action evidence, item origins and NPC observations. Your private journal appears beside the map. A durable local worker maintains fact summaries and investigation proposals without model calls. Read [memory and work-loop details](docs/MEMORY.md); inspect work with `npm run steward:status`. OpenAI is selected; model and daily budget remain pending, and inference is disabled.
+World memory now records versioned action evidence, item origins and NPC observations. Your private journal appears beside the map. A durable local worker maintains fact summaries and investigation proposals without model calls. Read [memory and work-loop details](docs/MEMORY.md); inspect work with `npm run steward:status`. As inspected on 7 October 2026, the owner has saved OpenAI model `gpt-5.6-sol` and a $10 daily ceiling. Runtime owner settings remain authoritative. Inference is disabled and spending enforcement is not implemented.
 
 ## Owner dashboard
 

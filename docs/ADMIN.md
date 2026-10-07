@@ -36,9 +36,11 @@ Keep a protected copy of `owner-seal.key` with the backup recovery materials. Lo
 
 ## Current limits and next integration
 
-Model execution is disabled in both runtime behavior and owner APIs. Model and budget remain unset until the owner supplies them. A saved budget is a declaration for the future runtime, not an implemented spending limiter. No paid inference calls were used to build or test this dashboard; provider tests use a mock transport.
+Model execution is disabled in both runtime behavior and owner APIs. As inspected on 7 October 2026, the owner has saved model `gpt-5.6-sol` and a $10 daily ceiling; `owner_settings` remains the authority for subsequent changes. A saved budget is a declaration for the future runtime, not an implemented spending limiter. No paid inference calls were used to build or test this dashboard; provider tests use a mock transport.
 
 World interpretation, generated Recognition, autonomous coding, asset generation, independent releases, spending accounting and operator recovery are not implemented. Existing memory summaries and investigations are deterministic. The next provider milestone must implement metered durable model jobs, structured proposals, local validation, replay/deduplication and failure recovery before enabling inference. Developer execution requires isolated workspaces and a tested release/rollback path under the constitution.
+
+See [the researched autonomy architecture](AUTONOMY.md) for the complete learning and operating loop, future Observatory views, failure drills and implementation order.
 
 This dashboard is locally operational. Public hosting still needs the launch gates in BASELINE.md, including real player accounts, HTTPS, explicit origin configuration, secure cookies, process supervision, permissions and capacity checks. Remote owner login currently requires trusted OS access to run the launcher; there is no account recovery, MFA or delegated admin account system. The container recipe is supplied but has not been built on this machine.
 
