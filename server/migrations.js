@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 export function migrate(db) {
   const version = db.prepare('PRAGMA user_version').get().user_version;
   if (version > SCHEMA_VERSION) throw new Error('Database is newer than this release; refusing to downgrade it.');
@@ -63,6 +63,25 @@ export function migrate(db) {
         progress TEXT NOT NULL DEFAULT 'Waiting',report TEXT,error TEXT
       );
       CREATE INDEX developer_runs_day ON developer_runs(started_at,state);
+    `);
+    if(version<6)db.exec(`
+      ALTER TABLE developer_runs ADD COLUMN origin TEXT NOT NULL DEFAULT 'owner';
+      ALTER TABLE developer_runs ADD COLUMN context TEXT;
+      CREATE TABLE developer_lessons(
+        run_id TEXT PRIMARY KEY REFERENCES developer_runs(id),
+        outcome TEXT NOT NULL, finding TEXT NOT NULL, evidence TEXT NOT NULL, created_at INTEGER NOT NULL
+      );
+      CREATE TABLE visual_releases(
+        id TEXT PRIMARY KEY,run_id TEXT REFERENCES developer_runs(id),
+        artifact TEXT NOT NULL,sha256 TEXT NOT NULL,previous_id TEXT,
+        state TEXT NOT NULL CHECK(state IN ('active','retired','rolled_back')),
+        created_at INTEGER NOT NULL,reason TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX visual_release_active ON visual_releases(state) WHERE state='active';
+      CREATE TRIGGER visual_artifact_immutable BEFORE UPDATE OF artifact,sha256,run_id,previous_id ON visual_releases
+      BEGIN SELECT RAISE(ABORT,'Release artifacts are immutable'); END;
+      CREATE TRIGGER visual_release_no_delete BEFORE DELETE ON visual_releases
+      BEGIN SELECT RAISE(ABORT,'Release history is retained'); END;
     `);
     db.exec(`PRAGMA user_version=${SCHEMA_VERSION}; COMMIT;`);
   } catch (error) { db.exec('ROLLBACK'); throw error; }

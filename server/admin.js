@@ -55,13 +55,13 @@ export function createAdmin({store,steward,dataDir,backupDir=resolve('backups'),
       if(path==='/api/admin/developer/report'&&req.method==='GET'){send(res,200,await dev.report(url.searchParams.get('id')));return true;}
       if(path.startsWith('/api/admin/developer/')&&req.method==='POST'){
         const input=await body(req),action=path.slice('/api/admin/developer/'.length);
-        const actions={refresh:()=>dev.refresh(),poll:()=>dev.refresh(false),login:()=>dev.signIn(input.type),cancelLogin:()=>dev.cancelLogin(),disconnect:()=>dev.disconnect(),isolation:()=>dev.verifyIsolation(),settings:()=>dev.saveConfig(input),tasks:()=>dev.enqueue(input),cancel:()=>dev.cancel(input.id)};
+        const actions={refresh:()=>dev.refresh(),poll:()=>dev.refresh(false),login:()=>dev.signIn(input.type),cancelLogin:()=>dev.cancelLogin(),disconnect:()=>dev.disconnect(),isolation:()=>dev.verifyIsolation(),settings:()=>dev.saveConfig(input),tasks:()=>dev.enqueue(input),cancel:()=>dev.cancel(input.id),autonomy:()=>dev.saveAutonomy(input),wake:()=>dev.wake(),rollback:()=>dev.rollbackVisuals()};
         if(!actions[action])throw fail('Unknown developer action');
         try{send(res,200,await actions[action]());}catch(e){if(e.status)throw e;throw fail('Codex operation failed. Reconnect or check the installed CLI.',502);}return true;
       }
       if(path==='/api/admin/overview'&&req.method==='GET'){
         const counts=Object.fromEntries(DATA_TABLES.map(table=>[table,db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get().count]));
-        send(res,200,{version:'0.4.0',schemaVersion:SCHEMA_VERSION,uptimeSeconds:Math.floor((clock()-started)/1000),online:online(),counts,worker:steward.status(),paused:control.get('workerPaused',false),ai:{...control.ai(),credentialConfigured:secrets.configured(),runtimeReady:false,modelCallsEnabled:false},backups:await backups(),recentAudit:db.prepare('SELECT * FROM admin_audit ORDER BY id DESC LIMIT 8').all(),capabilities:{memory:true,modelInterpretation:false,codexDevelopment:true,autonomousDevelopment:false,automaticReleases:false}});return true;
+        send(res,200,{version:'0.5.0',schemaVersion:SCHEMA_VERSION,uptimeSeconds:Math.floor((clock()-started)/1000),online:online(),counts,worker:steward.status(),paused:control.get('workerPaused',false),ai:{...control.ai(),credentialConfigured:secrets.configured(),runtimeReady:false,modelCallsEnabled:false},backups:await backups(),recentAudit:db.prepare('SELECT * FROM admin_audit ORDER BY id DESC LIMIT 8').all(),capabilities:{memory:true,modelInterpretation:false,codexDevelopment:true,autonomousDevelopment:true,automaticReleases:'visual-data'}});return true;
       }
       if(path==='/api/admin/data'&&req.method==='GET'){send(res,200,tablePage(db,url.searchParams.get('table')||'events',url.searchParams.get('page')||0,url.searchParams.get('q')||''));return true;}
       if(path==='/api/admin/documents'&&req.method==='GET'){

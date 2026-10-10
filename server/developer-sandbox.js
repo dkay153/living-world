@@ -1,4 +1,4 @@
-import { mkdir,readdir,lstat,readFile,writeFile,copyFile,realpath } from 'node:fs/promises';
+import { mkdir,readdir,lstat,readFile,writeFile,copyFile,realpath,unlink } from 'node:fs/promises';
 import { resolve,relative,join,sep } from 'node:path';
 import { createHash } from 'node:crypto';
 import { prepareCodexHome,codexEnvironment,codexBinary,runProcess } from './codex-process.js';
@@ -57,5 +57,5 @@ export async function checkSandbox({home,candidate,protectedPaths,binary=codexBi
     const result=await runner(binary,['sandbox','-C',candidate,'-P','living-world','--',process.execPath,'-e',script],{cwd:candidate,env:codexEnvironment(home,resolve(candidate,'.scratch')),timeoutMs:20000});
     if(result.code!==0||result.timedOut||result.cancelled||result.overflow||!result.stdout.includes('LW_ISOLATION_OK'))throw new Error('Isolation check failed. Developer execution stays blocked.');
     return {ok:true,checkedAt:Date.now(),platform:process.platform,filesystem:'restricted',network:'blocked'};
-  }finally{await new Promise(accept=>listener.close(accept));}
+  }finally{await new Promise(accept=>listener.close(accept));await unlink(resolve(candidate,'lw-canary.txt')).catch(()=>{});}
 }

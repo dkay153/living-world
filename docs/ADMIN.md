@@ -39,7 +39,7 @@ Keep a protected copy of `owner-seal.key` with the backup recovery materials. Lo
 
 World/API model execution remains disabled in runtime behavior and owner APIs. Codex account development is a separate, explicitly enabled route with its own local allowances. As inspected on 7 October 2026, the owner has saved model `gpt-5.6-sol` and a $10 daily ceiling; `owner_settings` remains the authority for subsequent changes. A saved budget is a declaration for the future runtime, not an implemented spending limiter. No paid inference calls were used to build or test this dashboard; provider tests use a mock transport.
 
-World interpretation, generated Recognition, self-selected development, asset generation, independent releases, API spending accounting and operator recovery are not implemented. Owner-queued Codex development copies are implemented. Existing memory summaries and investigations are deterministic. The next provider milestone must implement metered durable model jobs, structured proposals, local validation, replay/deduplication and failure recovery before enabling inference. Codex development uses isolated workspaces; promotion still requires a future independent release/rollback path under the constitution.
+World interpretation, generated Recognition, general source releases, external asset-generation providers, API spending accounting and unattended operator recovery are not implemented. Owner and self-selected Codex development copies, outcome feedback and validated visual-data releases are implemented. Existing memory summaries and investigations are deterministic. The next provider milestone must implement metered durable model jobs, structured proposals, local validation, replay/deduplication and failure recovery before enabling inference. Codex development uses isolated workspaces; general source promotion still requires a separate protected runtime and independent compatibility/recovery gates under the constitution.
 
 See [the researched autonomy architecture](AUTONOMY.md) for the complete learning and operating loop, future Observatory views, failure drills and implementation order.
 
@@ -48,3 +48,7 @@ This dashboard is locally operational. Public hosting still needs the launch gat
 ## Validation
 
 Automated checks cover authentication separation, ticket reuse/expiry, session expiry, CSRF/origin rejection, persistent worker pause, data pagination/redaction, consistent export and backup recovery, encryption/recovery, disabled inference, local job retries, audited proposal decisions and migration rollback. Browser checks cover desktop/mobile presentation, searchable history, full evidence records, owner controls and backup creation.
+
+## Independent work in v0.5.0
+
+The Codex developer page now includes self-selected work, cadence, verified outcomes, validated visual-data publication and rollback. These use the owner-selected account model and existing run/time limits. General code releases, World Intelligence inference and unattended host restart/recovery remain future work. See [the development loop](DEVELOPER_LOOP.md) and [Codex development](CODEX_DEVELOPER.md). Schema 6 requires a consistent backup before migration.

@@ -1,5 +1,7 @@
 # Living World day one quality requirements
 
+Current implementation: v0.5.0 has bounded self-selected Codex work, outcome memory and validated visual-data releases. Read [CODEX_DEVELOPER.md](CODEX_DEVELOPER.md) for actual capabilities and remaining limits; the research and acceptance conditions below remain broader than the implemented slice.
+
 The autonomous steward must preserve a playable, coherent world while learning and changing it. Its first independent release needs evidence about correctness, continuity, creative quality, spending and recovery. One successful demonstration is insufficient. The acceptance conditions below strengthen [AUTONOMY.md](AUTONOMY.md); they do not freeze replaceable mechanics or expand owner permissions.
 
 Day one means the first release of each enabled capability. Model interpretation, content application, code execution, asset generation and release promotion have separate readiness gates. A disabled capability can remain honestly unavailable while the game runs. Perfection cannot be established in advance; known failure modes can be constrained and remaining uncertainty made visible.

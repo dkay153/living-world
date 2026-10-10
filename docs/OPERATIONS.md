@@ -32,3 +32,7 @@ No container engine is installed on this machine. A Linux container recipe is su
 Schema 5 persists owner-queued Codex development attempts. Keep `DATA_DIR/developer-runs` for source manifests, candidate copies and changes. `DATA_DIR/codex-home` contains a separate Codex credential cache; protect it like a password and never include it in public artifacts. SQLite backups do not include this cache or candidate directories. Prefer a fresh device-code sign-in on the destination server. Preserve the existing API seal separately as described above.
 
 After a server restart, developer isolation must be verified again before queued tasks can dispatch. Expired attempts become interrupted and disable execution; they do not retry account usage automatically. Account allowances are local task/time limits, not the API dollar budget. Public-server isolation, service staging and automatic promotion/rollback remain unimplemented. See [Codex operating details](CODEX_DEVELOPER.md).
+
+## Independent work in v0.5.0
+
+The Codex developer page now includes self-selected work, cadence, verified outcomes, validated visual-data publication and rollback. These use the owner-selected account model and existing run/time limits. General code releases, World Intelligence inference and unattended host restart/recovery remain future work. See [the development loop](DEVELOPER_LOOP.md) and [Codex development](CODEX_DEVELOPER.md). Schema 6 requires a consistent backup before migration.

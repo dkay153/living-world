@@ -4,6 +4,17 @@ import { resolve } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 
 export const codexBinary=()=>process.env.LIVING_WORLD_CODEX_BIN||(process.platform==='win32'?'codex.exe':'codex');
+export function classifyCodexError(value){
+  const text=String(value).toLowerCase();
+  if(/unexpected argument|invalid value|no prompt|requires.*argument|cannot.*image|failed to.*image/.test(text))return 'cli_input';
+  if(/401|unauthorized|authentication|expired.*token|refresh.*token|sign in|not logged/.test(text))return 'account_auth';
+  if(/429|rate limit|usage limit|quota/.test(text))return 'account_limit';
+  if(/model.*not.*(available|supported|found)|unsupported.*model/.test(text))return 'model_unavailable';
+  if(/unrecognized.*(field|key)|invalid.*config|parse.*config|permission profile/.test(text))return 'configuration';
+  if(/sandbox|access is denied|permission denied/.test(text))return 'isolation';
+  if(/stream disconnected|connection|network|timed out|request failed/.test(text))return 'provider_connection';
+  return null;
+}
 export function codexEnvironment(home,temp=resolve(home,'tmp')) {
   // Never forward provider credentials, Node injection, or the owner's Codex settings.
   const names=['PATH','Path','SystemRoot','WINDIR','COMSPEC','PATHEXT','USERPROFILE','APPDATA','LOCALAPPDATA','PROGRAMFILES','ProgramFiles','ProgramFiles(x86)','SystemDrive','LANG'];
@@ -24,7 +35,7 @@ export function stopProcess(child) {
 export async function prepareCodexHome(home) {
   await mkdir(resolve(home,'tmp'),{recursive:true});
   // This is the project's own home. Never modify the desktop app's account/configuration.
-  const config=`forced_login_method = "chatgpt"\nmodel_provider = "openai"\napproval_policy = "never"\ndefault_permissions = "living-world"\ncli_auth_credentials_store = "file"\n[windows]\nsandbox = "mxc"\n[permissions.living-world]\nextends = ":workspace"\n[permissions.living-world.filesystem]\n":root" = "deny"\n":minimal" = "read"\n${JSON.stringify(process.execPath)} = "read"\n[permissions.living-world.filesystem.":workspace_roots"]\n"." = "write"\n[permissions.living-world.network]\nenabled = false\n`;
+  const config=`project_root_markers = ["AGENTS.md"]\nforced_login_method = "chatgpt"\nmodel_provider = "openai"\napproval_policy = "never"\ndefault_permissions = "living-world"\ncli_auth_credentials_store = "file"\n[windows]\nsandbox = "mxc"\n[permissions.living-world]\nextends = ":workspace"\n[permissions.living-world.filesystem]\n":root" = "deny"\n":minimal" = "read"\n${JSON.stringify(process.execPath)} = "read"\n[permissions.living-world.filesystem.":workspace_roots"]\n"." = "write"\n[permissions.living-world.network]\nenabled = false\n`;
   await writeFile(resolve(home,'config.toml'),config,{mode:0o600});
 }
 
@@ -32,16 +43,16 @@ export function runProcess(binary,args,{cwd,env,timeoutMs=30000,signal,maxBytes=
   return new Promise((resolveRun,reject)=>{
     if(signal?.aborted){reject(new Error('Operation cancelled'));return;}
     const child=spawnProcess(binary,args,{cwd,env,windowsHide:true,shell:false,stdio:['pipe','pipe','pipe']});
-    let stdout='',line='',bytes=0,timedOut=false,cancelled=false,overflow=false;const decoder=new StringDecoder('utf8');
+    let stdout='',line='',bytes=0,timedOut=false,cancelled=false,overflow=false,diagnostic=null;const decoder=new StringDecoder('utf8');
     const emit=value=>{try{onLine?.(value);}catch{overflow=true;void stopProcess(child);}};
     const stop=()=>{cancelled=true;void stopProcess(child);};signal?.addEventListener('abort',stop,{once:true});
     const timer=setTimeout(()=>{timedOut=true;void stopProcess(child);},timeoutMs);timer.unref?.();
     const cleanup=()=>{clearTimeout(timer);signal?.removeEventListener('abort',stop);};
     child.stdout.on('data',chunk=>{bytes+=chunk.length;if(bytes>maxBytes){overflow=true;void stopProcess(child);return;}const decoded=decoder.write(chunk);stdout+=decoded;if(onLine){line+=decoded;let i;while((i=line.indexOf('\n'))>=0){emit(line.slice(0,i));line=line.slice(i+1);}}});
     // Raw CLI logs may contain account material. Do not expose or persist them.
-    child.stderr.on('data',()=>{});
+    child.stderr.on('data',chunk=>{diagnostic=classifyCodexError(chunk.toString('utf8'))||diagnostic;});
     child.once('error',()=>{cleanup();reject(new Error('Codex executable unavailable'));});
-    child.once('close',code=>{cleanup();const end=decoder.end();stdout+=end;line+=end;if(line&&onLine)emit(line);resolveRun({code,stdout,timedOut,cancelled,overflow});});
+    child.once('close',code=>{cleanup();const end=decoder.end();stdout+=end;line+=end;if(line&&onLine)emit(line);resolveRun({code,stdout,timedOut,cancelled,overflow,diagnostic});});
     child.stdin.on('error',()=>{});child.stdin.end(input);
   });
 }

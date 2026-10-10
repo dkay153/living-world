@@ -1,5 +1,7 @@
 # Living World autonomous stewardship
 
+Current implementation: v0.5.0 has bounded self-selected Codex work, outcome memory and validated visual-data releases. Read [CODEX_DEVELOPER.md](CODEX_DEVELOPER.md) for actual capabilities and remaining limits; the research and acceptance conditions below remain broader than the implemented slice.
+
 Research and proposed architecture, 7 October 2026. This is a build specification, not a description of systems already running. The protected identity remains in [CONSTITUTION.md](CONSTITUTION.md); current implementation is described in [BASELINE.md](BASELINE.md), [MEMORY.md](MEMORY.md) and [ADMIN.md](ADMIN.md).
 
 [DAY_ONE.md](DAY_ONE.md) strengthens this architecture with evidence coverage, transactional command receipts, version compatibility, repeated evaluation, creative diversity and explicit capability gates. It also records two characterization findings in the current seed. Use both documents for the next implementation package.

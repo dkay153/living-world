@@ -35,7 +35,7 @@ test('account job records changes and checks without altering the live source or
   await assert.rejects(()=>dev.enqueue({...task,task:'A different task with the same receipt'}),/another task/);
   await dev.tick();const report=await dev.report(first.id);assert.equal(report.state,'succeeded');assert.equal(report.report.checks.passed,true);assert.equal(report.report.liveRelease,false);assert.ok(report.changes.some(c=>c.path==='public/new-visual.txt'));assert.deepEqual(await readFile('public/style.css'),live);
   const root=report.report.candidate;await assert.rejects(()=>readFile(join(root,'data/world.sqlite')),/ENOENT/);await assert.rejects(()=>readFile(join(root,'.env')),/ENOENT/);
-  assert.equal(calls.length,2);assert.ok(calls[0].args.includes('owner-selected-codex'));assert.equal(calls[0].options.env.CODEX_HOME,join(dataDir,'codex-home'));assert.equal(calls[0].options.env.OPENAI_API_KEY,undefined);assert.equal(calls[0].options.env.CODEX_API_KEY,undefined);
+  assert.equal(calls.length,3);assert.ok(calls.find(c=>c.args[0]==='exec').args.includes('owner-selected-codex'));assert.equal(calls[0].options.env.CODEX_HOME,join(dataDir,'codex-home'));assert.equal(calls[0].options.env.OPENAI_API_KEY,undefined);assert.equal(calls[0].options.env.CODEX_API_KEY,undefined);
   assert.equal(store.db.prepare('SELECT attempts FROM jobs WHERE id=?').get(first.id).attempts,1);assert.equal(dev.status().usage.reservedMinutes,2);
   assert.ok(store.db.prepare("SELECT 1 FROM admin_audit WHERE action='developer_candidate_completed'").get());
 }));
@@ -68,5 +68,24 @@ test('sign-in links must use the supported OpenAI authority; only sanitized acco
 });
 test('developer migration rollback preserves schema 4 and old history',async()=>{
   const dir=await mkdtemp(join(tmpdir(),'lw-developer-migration-')),db=new DatabaseSync(join(dir,'world.sqlite'));
-  try{migrate(db);db.exec("INSERT INTO players VALUES('historic',9,12);DROP TABLE developer_runs;PRAGMA user_version=4;CREATE TABLE developer_runs(id TEXT);");assert.throws(()=>migrate(db),/already exists/);assert.equal(db.prepare('PRAGMA user_version').get().user_version,4);assert.equal(db.prepare('SELECT x FROM players').get().x,9);db.exec('DROP TABLE developer_runs');migrate(db);assert.equal(db.prepare('PRAGMA user_version').get().user_version,SCHEMA_VERSION);}finally{db.close();await rm(dir,{recursive:true,force:true});}
+  try{migrate(db);db.exec("INSERT INTO players VALUES('historic',9,12);DROP TABLE developer_lessons;DROP TABLE visual_releases;DROP TABLE developer_runs;PRAGMA user_version=4;CREATE TABLE developer_runs(id TEXT);");assert.throws(()=>migrate(db),/already exists/);assert.equal(db.prepare('PRAGMA user_version').get().user_version,4);assert.equal(db.prepare('SELECT x FROM players').get().x,9);db.exec('DROP TABLE developer_runs');migrate(db);assert.equal(db.prepare('PRAGMA user_version').get().user_version,SCHEMA_VERSION);}finally{db.close();await rm(dir,{recursive:true,force:true});}
 });
+
+test('self-directed work uses the existing account allowance, carries outcomes and publishes only validated art data',async()=>harness(async({dev,enable,store,advance})=>{
+  await enable();dev.saveAutonomy({enabled:true,intervalMinutes:30,automaticVisuals:true});
+  const original=settings(store.db).ai(),live=await readFile('public/art.json');
+  await dev.tick();const status=dev.status();assert.equal(status.runs.length,1);assert.equal(status.runs[0].origin,'autonomous');assert.ok(status.visuals.active);
+  const report=await dev.report(status.runs[0].id);assert.equal(report.report.liveRelease,true);assert.equal(report.report.release.state,'published');assert.equal(status.autonomy.lessons[0].outcome,'visual_published');
+  assert.deepEqual(settings(store.db).ai(),original);assert.deepEqual(await readFile('public/art.json'),live);await dev.tick();assert.equal(dev.status().runs.length,1);
+  advance(30*60000);await dev.tick();assert.equal(dev.status().runs.length,2);const latest=store.db.prepare("SELECT context FROM developer_runs ORDER BY created_at DESC LIMIT 1").get();assert.ok(JSON.parse(latest.context).outcomes.length);
+  advance(30*60000);await dev.tick();assert.equal(dev.status().runs.length,2);dev.rollbackVisuals();assert.equal(dev.status().autonomy.config.automaticVisuals,false);
+},{executor:async(binary,args,options)=>{
+  if(args[0]==='exec'){const candidate=args[args.indexOf('-C')+1],pack=JSON.parse(await readFile(join(candidate,'public/art.json'),'utf8'));pack.name='Original dusk visual experiment';pack.palette.grass='#597047';await writeFile(join(candidate,'public/art.json'),JSON.stringify(pack));await writeFile(join(candidate,'development-result.json'),JSON.stringify({title:'Dusk palette',hypothesis:'Terrain may become more coherent',expectedOutcome:'Readable original terrain',validation:'Compare scenes; artistic claim unverified',nextStep:'Observe feedback'}));}
+  return {code:0,stdout:'Checks passed',timedOut:false,cancelled:false,overflow:false};
+}}));
+test('failed candidate checks never publish art and record an empirical failure rather than a model success claim',async()=>harness(async({dev,enable})=>{
+  await enable();dev.saveAutonomy({enabled:true,intervalMinutes:30,automaticVisuals:true});await dev.tick();assert.equal(dev.status().visuals.active,null);assert.equal(dev.status().autonomy.lessons[0].outcome,'checks_failed');
+},{executor:async(binary,args,options)=>{
+  if(args[0]==='exec'){const candidate=args[args.indexOf('-C')+1];const pack=JSON.parse(await readFile(join(candidate,'public/art.json'),'utf8'));pack.name='Proposed palette';await writeFile(join(candidate,'public/art.json'),JSON.stringify(pack));await writeFile(join(candidate,'development-result.json'),JSON.stringify({title:'Proposed art',hypothesis:'Claim',expectedOutcome:'Claim',validation:'Claim',nextStep:'Claim'}));return {code:0,stdout:''};}
+  return args[0]==='sandbox'?{code:1,stdout:'Regression observed'}:{code:0,stdout:'Prompt prepared'};
+}}));

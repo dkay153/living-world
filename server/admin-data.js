@@ -1,5 +1,5 @@
 import { publicIdentity } from './memory.js';
-export const DATA_TABLES=['players','gameplay','events','discoveries','environment','item_instances','knowledge','memories','jobs','checkpoints','improvements','admin_audit','developer_runs'];
+export const DATA_TABLES=['players','gameplay','events','discoveries','environment','item_instances','knowledge','memories','jobs','checkpoints','improvements','admin_audit','developer_runs','developer_lessons','visual_releases'];
 const jsonFields=new Set(['state','payload','input','result','value','summary','evidence','details','report']);
 export function createRedactor(db){
   const identities=new Map(db.prepare('SELECT id FROM players').all().map(r=>[r.id,`traveler-${publicIdentity(r.id)}`]));

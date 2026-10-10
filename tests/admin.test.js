@@ -76,7 +76,7 @@ test('failed owner migration rolls back new tables and preserves the prior world
   const dir=mkdtempSync(join(tmpdir(),'lw-admin-migration-')),db=new DatabaseSync(join(dir,'world.sqlite'));
   try{
     migrate(db);db.exec(`INSERT INTO players VALUES ('historic',9,12);INSERT INTO events(player,kind,subject) VALUES ('historic','discovery','stone');
-      DROP TABLE developer_runs;DROP TABLE owner_tickets;DROP TABLE owner_sessions;DROP TABLE owner_secrets;DROP TABLE admin_audit;
+      DROP TABLE developer_lessons;DROP TABLE visual_releases;DROP TABLE developer_runs;DROP TABLE owner_tickets;DROP TABLE owner_sessions;DROP TABLE owner_secrets;DROP TABLE admin_audit;
       PRAGMA user_version=3;`);
     // An unexpected pre-existing table simulates an interrupted/invalid migration prerequisite.
     assert.throws(()=>migrate(db),/owner_settings.*already exists/);
