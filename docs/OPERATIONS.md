@@ -25,3 +25,10 @@ To restore: stop the server; preserve the existing entire data folder as a recov
 6. Check health, multiplayer, persistence, reconnect and backup/restore before inviting players.
 
 No container engine is installed on this machine. A Linux container recipe is supplied but has not been built locally. Its database, credential seal and backups use the `/app/data` volume (`BACKUP_DIR=/app/data/backups`) and must survive container replacement. The current local process is not a Windows Sandbox VM.
+
+
+## Codex development state
+
+Schema 5 persists owner-queued Codex development attempts. Keep `DATA_DIR/developer-runs` for source manifests, candidate copies and changes. `DATA_DIR/codex-home` contains a separate Codex credential cache; protect it like a password and never include it in public artifacts. SQLite backups do not include this cache or candidate directories. Prefer a fresh device-code sign-in on the destination server. Preserve the existing API seal separately as described above.
+
+After a server restart, developer isolation must be verified again before queued tasks can dispatch. Expired attempts become interrupted and disable execution; they do not retry account usage automatically. Account allowances are local task/time limits, not the API dollar budget. Public-server isolation, service staging and automatic promotion/rollback remain unimplemented. See [Codex operating details](CODEX_DEVELOPER.md).

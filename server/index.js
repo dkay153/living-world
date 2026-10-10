@@ -24,7 +24,7 @@ const server=http.createServer(async(req,res)=>{
   res.setHeader('Cache-Control','no-store');
   res.setHeader('Referrer-Policy','no-referrer');
   if(await admin.handle(req,res))return;
-  if(req.url==='/healthz') { res.writeHead(200,{'Content-Type':'application/json'}); return res.end(JSON.stringify({ok:store.db.prepare('SELECT 1').get()!=null,version:'0.3.0',schemaVersion:SCHEMA_VERSION,memoryWorker:steward.status().paused?'paused':'enabled',modelCallsEnabled:false})); }
+  if(req.url==='/healthz') { res.writeHead(200,{'Content-Type':'application/json'}); return res.end(JSON.stringify({ok:store.db.prepare('SELECT 1').get()!=null,version:'0.4.0',schemaVersion:SCHEMA_VERSION,memoryWorker:steward.status().paused?'paused':'enabled',modelCallsEnabled:false})); }
   const file=publicFiles[req.url];
   if(!file || req.method!=='GET'){res.writeHead(404);return res.end('Not found');}
   try { const data=await readFile(new URL('../public/'+file[0],import.meta.url)); res.writeHead(200,{'Content-Type':file[1]});res.end(data); }
@@ -68,5 +68,7 @@ server.listen(port,host,()=>console.log(`Living World running at http://${host}:
 const heartbeat=setInterval(()=>{if(peers.size)broadcast();},2000);
 function runMemory(){try{steward.tick();}catch(e){console.error('memory_worker_failed',e.message);}}
 runMemory();const memoryWorker=setInterval(runMemory,2000);
-function stop(){clearInterval(heartbeat);clearInterval(memoryWorker);for(const ws of peers.keys())ws.close(1001,'Server stopping');wss.close();server.close(()=>{store.db.close();process.exit(0);});setTimeout(()=>process.exit(1),5000).unref();}
+function runDeveloper(){admin.developer.tick().catch(()=>console.error('developer_worker_failed'));}
+const developerWorker=setInterval(runDeveloper,2000);
+async function stop(){clearInterval(heartbeat);clearInterval(memoryWorker);clearInterval(developerWorker);await admin.developer.close();for(const ws of peers.keys())ws.close(1001,'Server stopping');wss.close();server.close(()=>{store.db.close();process.exit(0);});setTimeout(()=>process.exit(1),5000).unref();}
 process.on('SIGINT',stop);process.on('SIGTERM',stop);

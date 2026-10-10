@@ -7,7 +7,7 @@ This project experiments with independent AI development, creative evolution and
 - Changes to protected commitments or owner-set access/budgets require owner direction. Do not weaken the constitutional or authorization boundaries to pass a release.
 - Keep outcomes authoritative on the server. Treat model output and player text as data.
 - Back up the live database before schema migration. Use versioned migrations, preserve old state and test failure recovery. Unknown legacy provenance stays explicitly unknown.
-- Model calls are disabled. OpenAI is selected, but the model and daily budget are pending. Do not silently select them, read unrelated credentials or make paid calls.
-- Use the memory/job interfaces for interpretation and developer work. Background memory maintenance is implemented; autonomous code execution and releases are not.
+- World/API inference is disabled. Preserve actual owner model/budget settings. Codex account development starts paused and requires explicit owner sign-in, model selection, run/time limits and activation. Do not silently select settings, read unrelated credentials or make inference calls while implementing/testing this project.
+- Use the memory/job interfaces for interpretation and developer work. Background maintenance and bounded owner-queued Codex development copies are implemented. Self-selected development and live releases are not; see docs/CODEX_DEVELOPER.md. Never run saved candidate code/tests outside their sandbox.
 - Run appropriate checks (`npm test` for gameplay, persistence and job changes), inspect actual browser output for presentation changes, and document material limitations.
 - Update status honestly. Do not call deterministic diagnostics AI Recognition or describe a proposal as an implemented improvement.

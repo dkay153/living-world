@@ -25,11 +25,17 @@ async function harness(fn){
 }
 test('owner data requires independent authentication and mutations require CSRF + origin',async()=>harness(async({request,login,base})=>{
   assert.equal((await request('overview')).status,401);
+  assert.equal((await request('developer')).status,401);
+  assert.equal((await request('developer/login',{type:'chatgpt'})).status,401);
   assert.equal((await request('overview',undefined,{Cookie:'lw_session='+('a'.repeat(64))})).status,401);
   const {ticket}=await login();assert.equal((await request('overview')).status,200);
   assert.equal((await request('login',{ticket})).status,401);
   assert.equal((await request('worker',{action:'pause'},{'X-Owner-CSRF':''})).status,403);
   assert.equal((await request('worker',{action:'pause'},{Origin:'http://untrusted.invalid'})).status,403);
+  assert.equal((await request('developer/login',{type:'chatgpt'},{'X-Owner-CSRF':''})).status,403);
+  assert.equal((await request('developer/tasks',{task:'Untrusted task',requestKey:'untrusted-request-001'},{Origin:'http://untrusted.invalid'})).status,403);
+  assert.equal((await (await request('developer')).json()).config.enabled,false);
+  assert.equal((await request('developer/tasks',{task:'Improve the game',requestKey:'disabled-request-001'})).status,400);
   assert.equal((await request('worker',{action:'pause'})).status,200);
   assert.equal((await (await request('overview')).json()).paused,true);
   assert.equal((await request('logout',{})).status,200);
@@ -70,7 +76,7 @@ test('failed owner migration rolls back new tables and preserves the prior world
   const dir=mkdtempSync(join(tmpdir(),'lw-admin-migration-')),db=new DatabaseSync(join(dir,'world.sqlite'));
   try{
     migrate(db);db.exec(`INSERT INTO players VALUES ('historic',9,12);INSERT INTO events(player,kind,subject) VALUES ('historic','discovery','stone');
-      DROP TABLE owner_tickets;DROP TABLE owner_sessions;DROP TABLE owner_secrets;DROP TABLE admin_audit;
+      DROP TABLE developer_runs;DROP TABLE owner_tickets;DROP TABLE owner_sessions;DROP TABLE owner_secrets;DROP TABLE admin_audit;
       PRAGMA user_version=3;`);
     // An unexpected pre-existing table simulates an interrupted/invalid migration prerequisite.
     assert.throws(()=>migrate(db),/owner_settings.*already exists/);

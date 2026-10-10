@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 export function migrate(db) {
   const version = db.prepare('PRAGMA user_version').get().user_version;
   if (version > SCHEMA_VERSION) throw new Error('Database is newer than this release; refusing to downgrade it.');
@@ -53,6 +53,16 @@ export function migrate(db) {
       CREATE TABLE admin_audit(id INTEGER PRIMARY KEY,action TEXT NOT NULL,details TEXT NOT NULL,at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
       CREATE TRIGGER audit_no_update BEFORE UPDATE ON admin_audit BEGIN SELECT RAISE(ABORT,'Audit is append-only'); END;
       CREATE TRIGGER audit_no_delete BEFORE DELETE ON admin_audit BEGIN SELECT RAISE(ABORT,'Audit is append-only'); END;
+    `);
+    if(version<5)db.exec(`
+      CREATE TABLE developer_runs(
+        id TEXT PRIMARY KEY REFERENCES jobs(id),request_key TEXT NOT NULL UNIQUE,
+        task TEXT NOT NULL,model TEXT NOT NULL,max_minutes INTEGER NOT NULL,
+        state TEXT NOT NULL CHECK(state IN ('queued','running','succeeded','failed','cancelled','interrupted')),
+        created_at INTEGER NOT NULL,started_at INTEGER,finished_at INTEGER,
+        progress TEXT NOT NULL DEFAULT 'Waiting',report TEXT,error TEXT
+      );
+      CREATE INDEX developer_runs_day ON developer_runs(started_at,state);
     `);
     db.exec(`PRAGMA user_version=${SCHEMA_VERSION}; COMMIT;`);
   } catch (error) { db.exec('ROLLBACK'); throw error; }

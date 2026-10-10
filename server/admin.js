@@ -7,6 +7,7 @@ import { createOwnerAuth } from './owner-auth.js';
 import { settings,createSecretStore } from './owner-settings.js';
 import { DATA_TABLES,createRedactor,tablePage } from './admin-data.js';
 import { SCHEMA_VERSION } from './migrations.js';
+import { createDeveloper } from './developer.js';
 const send=(res,status,value)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 async function body(req){
@@ -14,8 +15,9 @@ async function body(req){
   let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>16000)throw fail('Request too large',413);}
   try{const value=JSON.parse(raw);if(!value||typeof value!=='object'||Array.isArray(value))throw new Error();return value;}catch{throw fail('Invalid JSON');}
 }
-export function createAdmin({store,steward,dataDir,backupDir=resolve('backups'),online=()=>0,clock=Date.now,fetcher=fetch}){
+export function createAdmin({store,steward,dataDir,backupDir=resolve('backups'),online=()=>0,clock=Date.now,fetcher=fetch,developer}){
   const db=store.db,auth=createOwnerAuth(db,clock),control=settings(db),secrets=createSecretStore(db,dataDir),started=clock();
+  const dev=developer||createDeveloper({store,dataDir,clock});
   const audit=(action,details={})=>db.prepare('INSERT INTO admin_audit(action,details) VALUES (?,?)').run(action,JSON.stringify(details));
   const root=new URL('../public/',import.meta.url),rate=new Map();let modelCheckRunning=false;
   const files={'/admin':['admin.html','text/html'],'/admin/':['admin.html','text/html'],'/admin.js':['admin.js','text/javascript'],'/admin.css':['admin.css','text/css']};
@@ -49,9 +51,17 @@ export function createAdmin({store,steward,dataDir,backupDir=resolve('backups'),
       }
       if(path==='/api/admin/session'&&req.method==='GET'){send(res,200,{csrf:session.csrf,expiresAt:session.expires_at});return true;}
       if(path==='/api/admin/logout'&&req.method==='POST'){auth.revoke(session);audit('owner_logout');res.setHeader('Set-Cookie','lw_owner=; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=0');send(res,200,{ok:true});return true;}
+      if(path==='/api/admin/developer'&&req.method==='GET'){send(res,200,dev.status());return true;}
+      if(path==='/api/admin/developer/report'&&req.method==='GET'){send(res,200,await dev.report(url.searchParams.get('id')));return true;}
+      if(path.startsWith('/api/admin/developer/')&&req.method==='POST'){
+        const input=await body(req),action=path.slice('/api/admin/developer/'.length);
+        const actions={refresh:()=>dev.refresh(),poll:()=>dev.refresh(false),login:()=>dev.signIn(input.type),cancelLogin:()=>dev.cancelLogin(),disconnect:()=>dev.disconnect(),isolation:()=>dev.verifyIsolation(),settings:()=>dev.saveConfig(input),tasks:()=>dev.enqueue(input),cancel:()=>dev.cancel(input.id)};
+        if(!actions[action])throw fail('Unknown developer action');
+        try{send(res,200,await actions[action]());}catch(e){if(e.status)throw e;throw fail('Codex operation failed. Reconnect or check the installed CLI.',502);}return true;
+      }
       if(path==='/api/admin/overview'&&req.method==='GET'){
         const counts=Object.fromEntries(DATA_TABLES.map(table=>[table,db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get().count]));
-        send(res,200,{version:'0.3.0',schemaVersion:SCHEMA_VERSION,uptimeSeconds:Math.floor((clock()-started)/1000),online:online(),counts,worker:steward.status(),paused:control.get('workerPaused',false),ai:{...control.ai(),credentialConfigured:secrets.configured(),runtimeReady:false,modelCallsEnabled:false},backups:await backups(),recentAudit:db.prepare('SELECT * FROM admin_audit ORDER BY id DESC LIMIT 8').all(),capabilities:{memory:true,modelInterpretation:false,autonomousDevelopment:false,automaticReleases:false}});return true;
+        send(res,200,{version:'0.4.0',schemaVersion:SCHEMA_VERSION,uptimeSeconds:Math.floor((clock()-started)/1000),online:online(),counts,worker:steward.status(),paused:control.get('workerPaused',false),ai:{...control.ai(),credentialConfigured:secrets.configured(),runtimeReady:false,modelCallsEnabled:false},backups:await backups(),recentAudit:db.prepare('SELECT * FROM admin_audit ORDER BY id DESC LIMIT 8').all(),capabilities:{memory:true,modelInterpretation:false,codexDevelopment:true,autonomousDevelopment:false,automaticReleases:false}});return true;
       }
       if(path==='/api/admin/data'&&req.method==='GET'){send(res,200,tablePage(db,url.searchParams.get('table')||'events',url.searchParams.get('page')||0,url.searchParams.get('q')||''));return true;}
       if(path==='/api/admin/documents'&&req.method==='GET'){
@@ -120,5 +130,5 @@ export function createAdmin({store,steward,dataDir,backupDir=resolve('backups'),
       throw fail('Admin endpoint not found',404);
     }catch(e){if(res.headersSent){res.destroy();}else send(res,e.status||500,{error:e.status?e.message:'Admin operation failed'});return true;}
   }
-  return {handle};
+  return {handle,developer:dev};
 }

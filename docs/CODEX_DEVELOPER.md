@@ -1,0 +1,45 @@
+# Codex account connection and development jobs
+
+Living World v0.4.0 connects a project-specific ChatGPT Codex account through the Observatory. It can queue bounded development tasks, let Codex change an isolated source copy, and retain changes and test evidence. Execution starts paused, with no account model or allowance selected. World Intelligence inference and automatic releases remain unimplemented.
+
+## Connect and start
+
+1. With the server running, use `npm run admin:open`. Select **Codex developer**.
+2. **Check connection** verifies the installed CLI without starting a model turn. Choose **Browser sign-in** or **Headless sign-in** and complete the OpenAI sign-in yourself. Browser sign-in uses the CLI's local callback; headless sign-in displays the official verification link and one-time code. Device-code access may need enabling in ChatGPT security settings or workspace permissions. [Official authentication guidance](https://learn.chatgpt.com/docs/auth).
+3. **Verify local isolation** checks writable candidate files, denied live database/account-home reads and denied host-loopback connections. A failed check blocks execution. Verification is required again after restarting the server and before every attempt against its actual copy.
+4. Select an exact model from the account's catalog. Set tasks per day, reserved Codex minutes per day and minutes per task. Choose **Enable bounded developer tasks** and save. No defaults are silently selected.
+5. Describe an improvement and start the task. Inspect its saved changes and checks under Development history. Cancel an individual task or **Pause & stop current task**. Disconnect signs out only this project's account.
+
+The existing OpenAI API model, dollar budget and encrypted key are independent. They are not used or changed by this connector. The account route uses ChatGPT Codex usage; local run/time caps cannot enforce an API dollar ceiling, measure exact monetary cost, or reserve quota against other account clients. Reported account usage windows remain account-wide. [Official account methods](https://learn.chatgpt.com/docs/app-server).
+
+## Connection architecture
+
+The HTTP owner session, exact-origin check and CSRF protection guard every connection mutation. The browser never receives tokens or a general RPC/shell endpoint. `server/codex-connection.js` exposes account status, managed sign-in/cancel/logout, model catalog and usage windows. The backend speaks newline-delimited RPC over a private child-process pipe to `codex app-server`; it opens no app-server network listener. Sign-in links must use HTTPS on `auth.openai.com`. Account responses expose only type, email and plan, with secrets filtered by explicit fields.
+
+Authentication is owned by Codex in `DATA_DIR/codex-home`, separate from the desktop application's home. Its credential cache must be protected like a password. Raw CLI stderr is discarded and authentication material is never copied into a candidate. The fixed configuration forces ChatGPT authentication and the OpenAI provider; it cannot silently fall back to API-key billing. [Authentication restriction configuration](https://learn.chatgpt.com/docs/config-file/config-reference). The broker receives a restricted environment without inherited API keys, credential variables or arbitrary Node startup options. The only injected Node options avoid metadata traversal through denied parent directories on this Windows runtime.
+
+The adapter was checked against installed `codex-cli 0.160.0` and its generated protocol schemas. The protocol is experimental: recheck initialization, sign-in shapes, model catalog, sandbox enforcement and cancellation when upgrading. A future distributed product should evaluate OpenAI's dedicated Sign in with ChatGPT integration and its registration/consent requirements rather than assuming this personal local connector is a complete public authentication product. [Sign in with ChatGPT integration guidance](https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server).
+
+## Attempts and evidence
+
+Schema 5 adds `developer_runs` linked to durable `codex_development` jobs. Request keys deduplicate repeated submissions; reusing a key for different text is rejected. One attempt runs at a time. The claim is renewed every five seconds with its current token. Account work has one permitted attempt: uncertain failures and expired leases are never automatically replayed. Recovery marks abandoned work interrupted, pauses execution and leaves artifacts for investigation.
+
+The host records the exact task/model/time allowance, source manifest/hash, state changes, bounded progress, final model summary, before/after file content or binary hashes, and test output. Test success does not imply release approval. Partial artifacts are retained on failure; a forcibly interrupted process may have incomplete output. Records stay in the owner database and `DATA_DIR/developer-runs/<id>`. There is no resume/retry button that could conceal a second account attempt; start a new task explicitly.
+
+Daily allowances reset at midnight UTC. Dispatch reserves the entire configured per-task Codex duration and checks both daily run count and reserved minutes. Cancelling a queued task spends no inference attempt, though it still counts against the conservative submission allowance that day. Testing has a separate two-minute wall limit and makes no inference calls. Output is bounded to 2 MiB; source/candidate inspection is bounded to 2,000 files, 512 KiB per file and 25 MiB per copy. There is no exact token ledger or dollar accounting for account usage yet.
+
+## Isolation and validation
+
+Snapshots contain the named source roots `server`, `public`, `tests`, `scripts`, `docs`, `config`, and top-level project instructions/manifests. They include current local source changes, not just committed HEAD. The installed `ws` dependency is copied without install scripts or network downloads. Live data, backups, outputs, environment files, Git metadata, account caches and unrelated directories are excluded. Symlinks are rejected during source copying and change inspection.
+
+Codex uses the project's fixed permission profile: deny filesystem reads by default, allow minimal system tools and the candidate workspace, and disable command networking. Windows explicitly requests MXC; there is no unrestricted fallback. The model broker can connect to OpenAI, while candidate commands cannot connect to the live game or other network services. Built-in web search is disabled for the task. [Permission profile semantics](https://learn.chatgpt.com/docs/permissions), [Windows sandbox guidance](https://learn.chatgpt.com/docs/windows/windows-sandbox).
+
+`codex exec` runs the exact owner-selected account model with structured activity output, ephemeral sessions, ignored external execution rules and strict configuration parsing. A separate watchdog owns the CLI process, bounds runtime/output, handles cancellation and stops its process tree when its game-server IPC connection closes. Windows MXC also terminates remaining sandbox children when the foreground command exits. This is host process and filesystem isolation, not a configured Windows Sandbox VM or a resource-limited production container. Linux/server isolation and abrupt host-failure recovery still need platform acceptance drills. [Non-interactive execution guidance](https://learn.chatgpt.com/docs/non-interactive-mode).
+
+The host runs offline combat, gameplay, queue, memory, world and developer fixtures inside the same restricted copy. HTTP/admin/WebSocket tests need network access and therefore require a later service-isolated staging environment. The candidate's ordinary tests are editable and provide evidence; they are not an independent constitutional validator. The host's `npm test` enumerates only its own top-level tests so it never recursively discovers and executes saved AI-candidate tests outside their sandbox.
+
+## Verified and remaining
+
+The real CLI initialization/account read and native sandbox canaries were exercised on this machine without inference. Mock-account fixtures cover bounded development, captured changes, preserved live files, deduplication, cancellation, terminal failure/recovery, lease renewal, authorization, environment filtering and migration rollback. The full application suite runs on the host; the offline subset also runs under actual Windows isolation. Browser checks cover the account controls and isolation result. No account has been signed in and no real model task has been run by this implementation session.
+
+Still required for the autonomous destination: self-selected goals and experiments, learning from outcomes, screenshot/visual evaluation, asset provider adapters with their own budgets, immutable release artifacts, independent constitutional and compatibility gates, service-isolated staging, backup/restore deployment drills and automatic promotion/rollback. These are the next release-system slice; this connector changes candidates only.

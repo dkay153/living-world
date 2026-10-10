@@ -20,6 +20,9 @@ export function createQueue(db,clock=Date.now) {
     finish(job,result) {
       return db.prepare("UPDATE jobs SET state='succeeded',result=?,finished_at=?,lease_until=NULL,lease_token=NULL WHERE id=? AND state='running' AND lease_token=? AND lease_until>?").run(JSON.stringify(result),clock(),job.id,job.token,clock()).changes===1;
     },
+    renew(job,leaseMs=30000) {
+      const now=clock();return db.prepare("UPDATE jobs SET lease_until=? WHERE id=? AND state='running' AND lease_token=? AND lease_until>?").run(now+leaseMs,job.id,job.token,now).changes===1;
+    },
     fail(job,error) {
       return db.prepare("UPDATE jobs SET state=CASE WHEN attempts>=max_attempts THEN 'failed' ELSE 'queued' END,error=?,available_at=?,lease_until=NULL,lease_token=NULL WHERE id=? AND state='running' AND lease_token=? AND lease_until>?").run(String(error).slice(0,500),clock()+Math.min(60000,1000*2**job.attempts),job.id,job.token,clock()).changes===1;
     },
