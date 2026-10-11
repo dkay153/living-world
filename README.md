@@ -6,6 +6,8 @@ The [day one quality requirements](docs/DAY_ONE.md) define the stricter evidence
 
 The [autonomous studio blueprint](docs/AUTONOMOUS_STUDIO.md) turns those principles into the full set of creative, engineering, testing and operations capabilities the steward needs, with a dependency-ordered build path.
 
+The [autonomous operation readiness audit](docs/AUTONOMY_READINESS_AUDIT.md) identifies the complete operating model, the owner-only Lab controls, the present gaps and the authority ladder for bringing the studio online safely.
+
 ## Windows localhost
 Requires Node.js 22.18 or later in the 22.x line. The current machine has 22.23.3.
 
