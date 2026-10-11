@@ -11,6 +11,7 @@ import { createAutonomy } from './autonomy.js';
 import { createVisualReleases } from './visual-releases.js';
 import { snapshotProject,inspectChanges,checkSandbox } from './developer-sandbox.js';
 import { loadStateRegistry } from './contracts.js';
+import { evaluateCandidate } from './candidate-evaluator.js';
 
 const defaults={enabled:false,model:null,dailyRuns:null,dailyMinutes:null,maxMinutes:null};
 const bad=message=>Object.assign(new Error(message),{status:400});
@@ -96,7 +97,7 @@ export function createDeveloper({store,dataDir,projectDir=resolve('.'),clock=Dat
   function progress(job,text){db.prepare("UPDATE developer_runs SET progress=? WHERE id=? AND state='running' AND EXISTS(SELECT 1 FROM jobs WHERE id=? AND lease_token=? AND lease_until>?)").run(text,job.id,job.id,job.token,clock());}
   async function execute(job,abort){
     const run=db.prepare('SELECT * FROM developer_runs WHERE id=?').get(job.id),folder=resolve(runsDir,job.id),candidate=resolve(folder,'candidate'),baseline=resolve(folder,'baseline'),planning=resolve(folder,'planning'),planningBaseline=resolve(folder,'planning-baseline');
-    let manifest=null,planningManifest=null,summary='',eventCount=0,changes=[],checks=null,decision=null,impact=null,changePlan=null,cliDiagnostic=null,release={state:'not_requested'};
+    let manifest=null,planningManifest=null,summary='',eventCount=0,changes=[],checks=null,decision=null,impact=null,changePlan=null,evaluation=null,cliDiagnostic=null,release={state:'not_requested'};
     const visualBaseline=visuals.read();
     let microLab=null,microLabCapture=null,microLabSource=null;
     try{
@@ -143,18 +144,19 @@ export function createDeveloper({store,dataDir,projectDir=resolve('.'),clock=Dat
       const requiredStateGroups=[...new Set(changes.flatMap(change=>stateSurfaceForPath(change.path)))];
       const missingStateGroups=requiredStateGroups.filter(group=>!impact?.affectedStateGroups.includes(group));
       checks={command:'node --test '+offline.join(' '),scope:'Offline gameplay, persistence, jobs, contracts and developer fixtures',limitations:'HTTP/admin/WebSocket integration tests require service-isolated staging. These are the candidate’s tests, not an independent constitutional release validator.',passed:tested.code===0&&!tested.timedOut&&!tested.cancelled&&!tested.overflow,discipline:{impactDeclared:!!impact,requiredStateGroups,missingStateGroups,passed:changes.length===0||(!!impact&&missingStateGroups.length===0)},output:tested.stdout.slice(-24000),timedOut:tested.timedOut};
-      const evidence={summary,decision,changePlan,impact,sourceHash:manifest.sourceHash,worldLab:microLab,changedFiles:changes.map(c=>({path:c.path,kind:c.kind,binary:!!c.binary})),protectedFilesChanged:changes.filter(c=>['AGENTS.md','docs/CONSTITUTION.md','config/constitution-fixtures.json'].includes(c.path),),checks,eventCount,candidate,liveRelease:false,release};
+      const protectedFilesChanged=changes.filter(c=>['AGENTS.md','docs/CONSTITUTION.md','config/constitution-fixtures.json'].includes(c.path),);
+      evaluation=evaluateCandidate({changes,checks,protectedFilesChanged:protectedFilesChanged.map(change=>change.path)});
+      const evidence={summary,decision,changePlan,impact,evaluation,sourceHash:manifest.sourceHash,worldLab:microLab,changedFiles:changes.map(c=>({path:c.path,kind:c.kind,binary:!!c.binary})),protectedFilesChanged,checks,eventCount,candidate,liveRelease:false,release};
       if(abort.signal.aborted)throw new Error('Task cancelled');
       transaction(()=>{const held=db.prepare("SELECT 1 FROM jobs WHERE id=? AND state='running' AND lease_token=? AND lease_until>?").get(job.id,job.token,clock());if(!held)throw new Error('Developer lease lost');
-        if(autonomy.config().automaticVisuals&&decision&&changePlan&&checks.discipline.passed&&impact?.affectedStateGroups.includes('presentation')&&checks.passed&&changes.some(c=>c.path==='public/art.json')){
-          if(evidence.protectedFilesChanged.length)release={state:'blocked',reason:'Protected identity or instructions changed'};
-          else {try{const text=changes.find(c=>c.path==='public/art.json').after;if(!text)throw new Error('Visual pack must be a readable JSON artifact');release=visuals.publish(JSON.parse(text),job.id,visualBaseline.hash,true);}catch(e){release={state:'blocked',reason:String(e.message).slice(0,200)};}}
+        if(autonomy.config().automaticVisuals&&decision&&changePlan&&impact?.affectedStateGroups.includes('presentation')&&evaluation.visualEligible){
+          try{const text=changes.find(c=>c.path==='public/art.json').after;if(!text)throw new Error('Visual pack must be a readable JSON artifact');release=visuals.publish(JSON.parse(text),job.id,visualBaseline.hash,true);}catch(e){release={state:'blocked',reason:String(e.message).slice(0,200)};}
         }
         evidence.release=release;evidence.liveRelease=release.state==='published';
-        const outcome=release.state==='published'?'visual_published':!checks.passed?'checks_failed':!checks.discipline.passed?'candidate_incomplete':changes.length?'candidate_validated':'no_change';
-        autonomy.learn(job.id,outcome,release.state==='published'?'Visual data passed the host gate and was published. Artistic improvement remains unmeasured.':!checks.passed?'The proposed copy failed its recorded checks. Do not treat the model summary as a verified improvement.':!checks.discipline.passed?'The candidate did not declare every state surface reached by its changed files. It is incomplete, not validated.':'Candidate checks completed; source code has not been released.',{checksPassed:checks.passed,discipline:checks.discipline,changedFiles:changes.map(c=>c.path),release,modelHypothesis:decision?.hypothesis||null,hypothesisVerified:false,modelNextStep:decision?.nextStep||null});
+        const outcome=release.state==='published'?'visual_published':evaluation.state==='rejected'?'checks_failed':evaluation.state==='incomplete'?'candidate_incomplete':evaluation.state==='no_change'?'no_change':'candidate_validated';
+        autonomy.learn(job.id,outcome,release.state==='published'?'Visual data passed the host gate and was published. Artistic improvement remains unmeasured.':evaluation.state==='rejected'?'The proposed copy failed its recorded checks. Do not treat the model summary as a verified improvement.':evaluation.state==='incomplete'?'The candidate did not declare every state surface reached by its changed files. It is incomplete, not validated.':evaluation.state==='no_change'?'The candidate made no substantive change.':'Candidate checks completed; source code has not been released.',{checksPassed:checks.passed,discipline:checks.discipline,evaluation,changedFiles:changes.map(c=>c.path),release,modelHypothesis:decision?.hypothesis||null,hypothesisVerified:false,modelNextStep:decision?.nextStep||null});
         if(!queue.finish(job,{report:evidence,changedFiles:changes.length}))throw new Error('Developer lease lost');
-        db.prepare("UPDATE developer_runs SET state='succeeded',progress=?,report=?,finished_at=? WHERE id=? AND state='running'").run(release.state==='published'?'Visual pack published · source proposal retained':checks.discipline.passed?'Candidate ready · source code not released':'Candidate incomplete · state impact must be reconciled',JSON.stringify(evidence),clock(),job.id);audit('developer_candidate_completed',{id:job.id,changedFiles:changes.length,testsPassed:checks.passed,disciplinePassed:checks.discipline.passed});});
+        db.prepare("UPDATE developer_runs SET state='succeeded',progress=?,report=?,finished_at=? WHERE id=? AND state='running'").run(release.state==='published'?'Visual pack published · source proposal retained':evaluation.state==='incomplete'?'Candidate incomplete · state impact must be reconciled':evaluation.state==='rejected'?'Candidate rejected · checks failed':evaluation.state==='no_change'?'Candidate complete · no substantive change':'Candidate ready · source code not released',JSON.stringify(evidence),clock(),job.id);audit('developer_candidate_completed',{id:job.id,changedFiles:changes.length,testsPassed:checks.passed,disciplinePassed:checks.discipline.passed,evaluation:evaluation.state});});
     }catch(e){
       if(manifest){try{changes=await inspectChanges(candidate,baseline,manifest);await writeFile(resolve(folder,'changes.json'),JSON.stringify(changes));}catch{}}
       const error=String(e.message).slice(0,300),evidence={summary,eventCount,cliDiagnostic,sourceHash:manifest?.sourceHash||null,changedFiles:changes.map(c=>({path:c.path,kind:c.kind})),checks,candidate,liveRelease:false};
