@@ -193,3 +193,77 @@ Living World has a serious foundation for a studio experiment: authoritative sta
 It is not yet a full autonomous game company. The current agent cannot independently play a candidate in a real staging world, measure real visual quality, create full original asset bundles, manage a causally consistent generated story, run model-driven Recognition, ship source code, or repair a failed production deploy. Those are the capabilities this blueprint orders and makes testable.
 
 The goal is not to claim perfection on day one. It is to give the agent every tool a small studio uses, then require each tool to earn its authority through observable work, recovered failures and better next decisions.
+
+## Deep research update: what changes after examining the hard cases
+
+This section records a second research pass on 11 October 2026. It changes the implementation emphasis in four useful ways.
+
+### 1. The candidate world is an evaluation product, not merely a safe server
+
+OpenAI's current sandbox architecture separates a trusted control plane from the execution workspace, uses a manifest as the fresh-workspace contract, supports snapshots/resumption, and can expose a sandbox port for an inspectable preview. [Sandbox Agents](https://developers.openai.com/api/docs/guides/agents/sandboxes) This matches Living World's next need precisely.
+
+The staging compartment should therefore be built as a first-class **World Lab** with a fixed contract:
+
+| World Lab input | Why it is required | Must not contain |
+| --- | --- | --- |
+| Candidate source hash and locked dependencies | The artifact being played must be exactly the artifact being evaluated | A write path into live source or release policy |
+| Fresh snapshot plus named historical fixtures | A feature can work for a new traveler and break a long-running quest/history | Live database, owner session, provider credentials or browser cookies |
+| Scenario seed, virtual clock and test identities | A failure must be reproducible and comparable across variants | A hidden dependency on live traffic or wall-clock luck |
+| Restricted service port and browser-driver channel | The agent must see the running game and operate it as a player | Host/production loopback reachability |
+| Artifact-only export directory | Screenshots, traces, report, world diff and candidate bundle are reviewable afterwards | An arbitrary mount of the repository or data directory |
+
+The lab needs two modes. **Clean-room mode** starts from a known fixture and is the authority for regressions. **Exploration mode** generates disposable worlds/identities/seeds to seek soft locks, odd combinations and visual/collision errors. Neither replaces real play; together they prevent the agent from treating one lucky demonstration as a release proof.
+
+### 2. A game tester needs three kinds of player, not one generic simulator
+
+Production game-testing research found that reinforcement-learning testing had to be integrated into established scripted-bot workflows, in part because development and final environments differ. [Gillberg et al.](https://arxiv.org/abs/2307.11105) A separate pixel-driven testing system used three complementary behaviors: space exploration, key-object detection and human-like investigation. It found collision defects that are easy to miss with ordinary scripts. [Inspector](https://arxiv.org/abs/2207.08379)
+
+Living World's test roster should use the same division of labour:
+
+- **Contract players** execute short explicit scenarios: new-game tutorial, movement/collision, first quest, every command, defeat/recovery, reconnect, duplicate delivery, two concurrent travelers and migration fixture. They prove known commitments.
+- **Explorer players** maximize unseen maps, object states, command combinations, quest branches and event signatures. They search for unknown failure modes and record the shortest replay.
+- **Intent players** behave like named styles: cautious survivor, curious explorer, resource hoarder, aggressive fighter, social helper and exploit seeker. They make balance and agency studies more useful than a uniform random walker.
+
+For an early 2D RPG, the first two can be deterministic graph/search tooling plus browser scenarios; reinforcement learning is optional and should be introduced only when measured coverage requires it. The important artifact is a **coverage map**: visited tiles, objects inspected, state/branch coverage, command combinations, events emitted, quest states reached and unique failures. A high completion count without this map is not evidence of broad testing.
+
+### 3. Narrative has to be a verified commitment system
+
+Recent interactive-narrative benchmarking reports a severe gap between fluent prose and durable consistency: its strongest evaluated model survived only 42% of 20-turn commitment tests, with fact-conflict rates of 40–68%. [NCP-Bench](https://arxiv.org/abs/2608.08160) The exact figures are from a recent benchmark and should not be treated as a universal model ranking; the architectural finding is stronger: narration must never be the world database.
+
+The World Intelligence design should become a four-step protocol:
+
+```text
+retrieve canonical facts + relevant beliefs
+→ draft a plan/diff against explicit commitments
+→ validate schema, affordances, causality, consent and current versions
+→ atomically apply a content-hashed diff, then narrate its result
+```
+
+This closely resembles the proposed Plan–Diff–Validate–Apply model for LLM-driven worlds, where structured state and parameterised actions remain canonical. [Orchestrated Reality](https://arxiv.org/abs/2606.16014) It is a work-in-progress paper, so it is an architectural lead rather than a validated production prescription.
+
+The required records expand slightly: each story thread should have a **commitment ledger** containing promise/constraint, owner, status, prerequisites, deadline or expiry, supporting fact IDs, player-visible framing, allowed resolutions and test cases. The World Lab then runs adversarial choices—refusal, delay, contradiction, theft of a required item, death, reconnect, two travelers pursuing the same lead—to prove the thread neither invents facts nor traps the player.
+
+Quest-generation research reaches the same practical conclusion from a smaller setting: novel language remains coherent when it is grounded in object/action knowledge graphs and world affordances. [Ammanabrolu et al.](https://arxiv.org/abs/1909.06283) In Living World, a quest generator must create structured solvable action graphs first; dialogue, flavour and surprise are a later projection.
+
+### 4. Creative evolution needs a portfolio, not a single "best" asset or quest
+
+If the studio maximizes one critic score, it will eventually discover a safe, repetitive aesthetic or quest formula. Quality-diversity research instead searches for many good solutions spread across explicitly chosen behavior dimensions. [Quality-Diversity PCG](https://arxiv.org/abs/1907.04053) This gives Living World a concrete creative-control method:
+
+| Content kind | Minimum quality gate | Diversity dimensions retained in the portfolio |
+| --- | --- | --- |
+| Map/region | reachable, readable, performant, compatible with quests | route shape, density, safety, verticality, landmark rhythm, biome/material mix |
+| Encounter | legal, counterplay exists, no exploit/reward breach | pacing, command pressure, enemy intent, resource demand, tactical motif |
+| Quest | causal, solvable, refusal path, no history conflict | premise, location, social role, dilemma, resolution type, discovery versus combat emphasis |
+| Sprite/effect | original, readable, accessible, fits budget | silhouette family, motion character, material, palette role, emotional tone |
+| NPC thread | factual, intentional, player agency retained | goal type, relationship arc, knowledge asymmetry, consequence scale, humour/grief/mystery register |
+
+The agent should generate a small portfolio, test all candidates structurally, then select or retain several diverse high-quality options. It should not repeatedly repaint grass or produce ten variants of the same fetch quest simply because a critic calls them clean.
+
+### The revised near-term proof
+
+The World Lab needs one added requirement before it is considered ready: its report must contain both **execution evidence** and **experience evidence**.
+
+- Execution evidence: source/build/content hashes, migration result, deterministic tests, event log, coverage map, trace, resource use and recovery result.
+- Experience evidence: desktop/mobile screenshots or short capture, readable-command checks, accessibility/motion result, scenario transcript, paired baseline/candidate comparison and clearly labelled model-critic or player feedback.
+
+This makes the first staged combat-telegraph proposal more valuable. The lab can prove it remains legal, visible and usable, then test whether the behavior of cautious and aggressive simulated players actually changes. If it does not, that is a learned result—not a failure to be hidden by a prettier claim.
