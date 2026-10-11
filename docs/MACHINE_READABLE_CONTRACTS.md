@@ -14,6 +14,6 @@ The contract files are versioned with the source for local development. They are
 
 ## Required workflow for an autonomous feature
 
-Before an agent edits a feature, it creates or updates its feature contract, traces every listed state group and writes its impact plan. It also writes `state-impact.json` with the exact registered state groups and recovery story it intends to affect. The host maps changed Realm/client/studio files to their minimum state surfaces. A candidate missing one of those surfaces is stored as **incomplete**, not validated, and cannot publish even a visual pack.
+Before an agent edits a feature, a separate planning workspace creates `change-plan.json` and `state-impact.json`. The planning workspace may write only those two files; any source edit fails the attempt before the editable candidate is started. The host copies the validated records into the candidate’s private scratch area, maps changed Realm/client/studio files to their minimum state surfaces, and stores a candidate missing one of those surfaces as **incomplete**, not validated. It cannot publish even a visual pack.
 
 This does not freeze ordinary evolution. A new mechanic, visual language, renderer, map system or content pipeline can add a state group by a versioned contract change, then provide its authority, visibility, transition, migration, presentation, test and retirement story.
