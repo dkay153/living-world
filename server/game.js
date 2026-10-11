@@ -1,4 +1,4 @@
-import { objects,creatureSeeds,destination } from './world.js';
+import { objects,creatureSeeds,destination,SPAWN } from './world.js';
 import { beginEncounter,resolveTurn } from './combat.js';
 import { randomUUID } from 'node:crypto';
 export function createGame(store,clock=Date.now){
@@ -29,7 +29,7 @@ export function createGame(store,clock=Date.now){
           const c=creatures.find(c=>c.id===encounter.id);c.hp=0;c.respawnAt=clock()+60000;store.saveEnvironment(c.id,c);
         }
         if(result.outcome==='retreat')record('retreat',encounter.id);
-        if(result.outcome==='defeat'){record('defeat',encounter.id,{recovery:{x:9,y:12}});state.deaths++;state.hp=state.maxHp;store.move(player.id,9,12);player.x=9;player.y=12;}
+        if(result.outcome==='defeat'){record('defeat',encounter.id,{recovery:SPAWN});state.deaths++;state.hp=state.maxHp;store.move(player.id,SPAWN.x,SPAWN.y);player.x=SPAWN.x;player.y=SPAWN.y;}
         return commit();
       }
       if(message.type==='heal'){

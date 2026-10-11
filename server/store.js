@@ -3,13 +3,14 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { migrate } from './migrations.js';
+import { SPAWN } from './world.js';
 export function openStore(path) {
   mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
   try { migrate(db); } catch(error) { db.close(); throw error; }
   return {
     db,
-    player(id) { db.prepare('INSERT OR IGNORE INTO players VALUES (?,9,12)').run(id); return db.prepare('SELECT * FROM players WHERE id=?').get(id); },
+    player(id) { db.prepare('INSERT OR IGNORE INTO players VALUES (?,?,?)').run(id,SPAWN.x,SPAWN.y); return db.prepare('SELECT * FROM players WHERE id=?').get(id); },
     move(id,x,y) { db.prepare('UPDATE players SET x=?,y=? WHERE id=?').run(x,y,id); },
     loadGame(id) { const row=db.prepare('SELECT state FROM gameplay WHERE id=?').get(id);return row?JSON.parse(row.state):{hp:30,maxHp:30,inventory:{dewleaf:0,shard:0},quest:'unstarted',victories:0,deaths:0}; },
     saveGame(id,state) { db.prepare('INSERT INTO gameplay VALUES (?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state').run(id,JSON.stringify(state)); },

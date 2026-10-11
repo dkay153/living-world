@@ -14,9 +14,13 @@
     "steward:once": "node scripts/steward-status.js --once",
     "admin:open": "node scripts/admin-open.js",
     "admin:prepare": "node scripts/admin-open.js --prepare",
-    "godot:check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/godot-check.ps1"
+    "godot:check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/godot-check.ps1",
+    "lab:micro": "node scripts/micro-world-lab.js"
   },
   "dependencies": {
     "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0"
   }
 }
