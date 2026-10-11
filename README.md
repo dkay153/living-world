@@ -8,6 +8,8 @@ The [autonomous studio blueprint](docs/AUTONOMOUS_STUDIO.md) turns those princip
 
 The [autonomous operation readiness audit](docs/AUTONOMY_READINESS_AUDIT.md) identifies the complete operating model, the owner-only Lab controls, the present gaps and the authority ladder for bringing the studio online safely.
 
+The [autonomous stewardship charter](docs/AUTONOMOUS_STEWARDSHIP_CHARTER.md) defines the final AI-run operating model: hard identity and external-authority boundaries, fully autonomous ordinary work, executable player-contract fixtures, quality controls and the path to earned release authority.
+
 The [online runtime platform decision](docs/ONLINE_RUNTIME_PLATFORM.md) selects a Godot client path for browser and future downloadable clients, keeps the Realm authoritative, and defines the AI-operated World Lab and migration gates.
 
 Godot 4.7.2 is now installed as the local client toolchain. The first text-first engine shell is in [`client-godot/`](client-godot/); `npm run godot:check` imports it and checks its explicit read-only authority boundary without manual editor work.
