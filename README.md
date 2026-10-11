@@ -10,6 +10,8 @@ The [autonomous operation readiness audit](docs/AUTONOMY_READINESS_AUDIT.md) ide
 
 The [autonomous stewardship charter](docs/AUTONOMOUS_STEWARDSHIP_CHARTER.md) defines the final AI-run operating model: hard identity and external-authority boundaries, fully autonomous ordinary work, executable player-contract fixtures, quality controls and the path to earned release authority.
 
+The [complete capability atlas](docs/COMPLETE_CAPABILITY_ATLAS.md) is the full structural inventory of player mechanics, world systems, creative production, autonomous intelligence, platform, operations and owner-only boundaries that must be considered before calling any part of the experiment complete.
+
 The [online runtime platform decision](docs/ONLINE_RUNTIME_PLATFORM.md) selects a Godot client path for browser and future downloadable clients, keeps the Realm authoritative, and defines the AI-operated World Lab and migration gates.
 
 Godot 4.7.2 is now installed as the local client toolchain. The first text-first engine shell is in [`client-godot/`](client-godot/); `npm run godot:check` imports it and checks its explicit read-only authority boundary without manual editor work.
