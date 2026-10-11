@@ -13,7 +13,8 @@
     "steward:status": "node scripts/steward-status.js",
     "steward:once": "node scripts/steward-status.js --once",
     "admin:open": "node scripts/admin-open.js",
-    "admin:prepare": "node scripts/admin-open.js --prepare"
+    "admin:prepare": "node scripts/admin-open.js --prepare",
+    "godot:check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/godot-check.ps1"
   },
   "dependencies": {
     "ws": "8.22.0"
