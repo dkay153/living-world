@@ -4,6 +4,8 @@ Persistent local 2D RPG foundation. Read [the baseline plan](docs/BASELINE.md) f
 
 The [Living World system baseline](docs/LIVING_WORLD_SYSTEM_BASELINE.md) is the detailed state inventory the AI must use before it changes gameplay, presentation, persistence, content, release or operating behaviour.
 
+`npm run contracts:check` validates the machine-readable protected commitments, state vocabulary and feature contracts. The contracts are a source-of-truth seam for the future autonomous planner and evaluator; they do not yet grant a source release path.
+
 The [day one quality requirements](docs/DAY_ONE.md) define the stricter evidence, compatibility, evaluation and recovery gates for each autonomous capability.
 
 The [autonomous studio blueprint](docs/AUTONOMOUS_STUDIO.md) turns those principles into the full set of creative, engineering, testing and operations capabilities the steward needs, with a dependency-ordered build path.

@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "stateGroups": [
+    {"id":"player.identity","authority":"realm","visibility":"owner_or_player","description":"Durable traveler identity, account association and consent."},
+    {"id":"player.presence","authority":"connection","visibility":"session","description":"Connection, synchronization and replacement-session state."},
+    {"id":"player.location","authority":"realm","visibility":"world_filtered","description":"Region, position, safe anchor and movement lock."},
+    {"id":"player.vitality","authority":"realm","visibility":"player","description":"Vitality, recovery and future status-effect state."},
+    {"id":"player.inventory","authority":"realm","visibility":"player","description":"Item instances, ownership, consumption and future equipment."},
+    {"id":"player.identity_evidence","authority":"realm","visibility":"player","description":"Behavior evidence and future Recognition decisions."},
+    {"id":"encounter","authority":"realm","visibility":"participants","description":"Distinct command-driven encounter lifecycle and receipts."},
+    {"id":"quest_and_dialogue","authority":"realm","visibility":"player_or_observer","description":"Quest graph, dialogue availability, journal and player choices."},
+    {"id":"world.topology","authority":"content_release","visibility":"world_filtered","description":"Map revision, cells, collision, anchors and routes."},
+    {"id":"world.entities","authority":"realm","visibility":"world_filtered","description":"Creatures, NPCs, resources, landmarks and environmental events."},
+    {"id":"world.history","authority":"realm","visibility":"scoped","description":"Canonical receipts, discoveries, beliefs and knowledge records."},
+    {"id":"presentation","authority":"client_and_content_release","visibility":"player","description":"HUD, health meter, animation, accessibility and quality-tier state."},
+    {"id":"protocol","authority":"realm","visibility":"session","description":"Intent, snapshot/delta version, retry and reconnect state."},
+    {"id":"persistence","authority":"realm","visibility":"owner_audit","description":"Schema, migration, backup, restore and compatibility state."},
+    {"id":"content","authority":"content_release","visibility":"public_after_release","description":"Versioned map, quest, ability, asset and audio definitions."},
+    {"id":"studio.candidate","authority":"studio_control_plane","visibility":"owner_audit","description":"Autonomous plan, sandbox candidate, evaluation and lesson."},
+    {"id":"operations.release","authority":"release_control_plane","visibility":"owner_audit","description":"Artifact, staged release, health, rollback and incident state."}
+  ]
+}

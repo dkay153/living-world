@@ -10,6 +10,7 @@ The harness is a **trusted-baseline** environment. It never runs saved AI candid
 
 - The real browser client connects to the real isolated Realm.
 - The micro fixture preserves its expected dimensions and narrative anchors, and a WebSocket move is accepted only when the authoritative Realm broadcasts the resulting position.
+- A second WebSocket traveler performs the actual First Echo path: speaks with Mara, gathers two dewleaf, discovers the stone, earns two shards, completes the quest, is defeated by the Warden, and reconnects at the safe anchor with the completed history intact.
 - The rendered scene is nonblank, has a basic color/luminance range, retains the canvas label and primary interaction control, and fits the reference viewport.
 - The run produces a screenshot and structured report. A successful report and capture are attached to the next isolated developer run as evidence, so the developer can choose its own focused hypothesis without a human-authored improvement task.
 

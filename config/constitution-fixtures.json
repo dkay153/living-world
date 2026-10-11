@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "protectedCommitments": [
+    {
+      "id": "shared-top-down-exploration",
+      "statement": "A traveler explores a shared physical top-down world and observes durable consequences.",
+      "requiredSignals": ["world_map", "validated_movement", "persistent_consequence"]
+    },
+    {
+      "id": "command-driven-encounter",
+      "statement": "A traveler enters a distinct encounter and makes meaningful command choices resolved by the Realm.",
+      "requiredSignals": ["encounter_state", "attack_command", "defensive_or_alternative_command", "authoritative_resolution"]
+    },
+    {
+      "id": "ordinary-behavior-led-identity",
+      "statement": "A traveler begins ordinary and identity emerges from behavior rather than mandatory class selection.",
+      "requiredSignals": ["no_mandatory_class_selection", "behavior_evidence"]
+    },
+    {
+      "id": "history-and-recovery",
+      "statement": "A saved traveler retains meaningful history and recoverable progress through reconnect, release and restore.",
+      "requiredSignals": ["persistent_character_state", "history_receipt", "recovery_route"]
+    },
+    {
+      "id": "readable-original-presentation",
+      "statement": "Exploration, encounter and dialogue remain original, readable and accessible at supported quality tiers.",
+      "requiredSignals": ["original_presentation", "readability_check", "accessible_feedback"]
+    },
+    {
+      "id": "player-agency",
+      "statement": "The core loop rewards discovery, decision and consequence without coercive engagement pressure.",
+      "requiredSignals": ["meaningful_choice", "refusal_or_alternative", "no_streak_pressure"]
+    }
+  ]
+}

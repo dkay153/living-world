@@ -1,5 +1,6 @@
 import { createServer } from 'node:net';
 import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -13,6 +14,33 @@ async function freePort(){return new Promise((resolve,reject)=>{const s=createSe
 async function until(check,message){for(let attempt=0;attempt<80;attempt++){try{const value=await check();if(value)return value;}catch{/* server is still starting */}await wait(100);}throw new Error(message);}
 async function welcome(url,origin){return new Promise((resolve,reject)=>{const socket=new WebSocket(url,{origin});const timer=setTimeout(()=>{socket.terminate();reject(new Error('World Lab WebSocket welcome timed out'));},5000);socket.once('error',reject);socket.on('message',raw=>{const message=JSON.parse(raw);if(message.type==='welcome'){clearTimeout(timer);socket.close();resolve(message);}});});}
 async function exerciseMovement(url,origin){return new Promise((resolve,reject)=>{const socket=new WebSocket(url,{origin});let id='',moved=false;const timer=setTimeout(()=>{socket.terminate();reject(new Error('World Lab server-authoritative movement timed out'));},5000);socket.once('error',reject);socket.on('message',raw=>{const message=JSON.parse(raw);if(message.type==='welcome'){id=message.id;socket.send(JSON.stringify({type:'move',direction:'right'}));moved=true;return;}if(moved&&message.type==='state'&&message.players.some(player=>player.id===id&&player.x===4&&player.y===10)){clearTimeout(timer);socket.close();resolve({id,x:4,y:10});}});});}
+async function playJourney(url,origin){
+  let socket,id,cookie='',welcomeState,lastState,stateVersion=0;
+  const waitFor=predicate=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>{cleanup();reject(new Error('World Lab journey timed out'));},8000);const check=()=>{try{if(predicate()){cleanup();resolve(lastState);}}catch(error){cleanup();reject(error);}};const cleanup=()=>{clearTimeout(timer);socket.off('message',check);};socket.on('message',check);check();});
+  const connect=async suppliedCookie=>new Promise((resolve,reject)=>{socket=new WebSocket(url,{origin,headers:suppliedCookie?{Cookie:suppliedCookie}:{}});const timer=setTimeout(()=>{socket.terminate();reject(new Error('World Lab journey welcome timed out'));},5000);socket.once('error',reject);socket.once('upgrade',response=>{const value=response.headers['set-cookie'];if(Array.isArray(value)&&value[0])cookie=value[0].split(';')[0];});socket.on('message',raw=>{const message=JSON.parse(raw);if(message.type==='welcome'){clearTimeout(timer);id=message.id;welcomeState=message;resolve(message);}if(message.type==='state'){lastState=message;stateVersion++;}});});
+  const position=()=>{const player=lastState?.players.find(player=>player.id===id);if(!player)throw new Error('Journey player is absent from authoritative state');return player;};
+  const cell=(x,y)=>welcomeState.tiles[y]?.[x];
+  const route=(from,goal)=>{const queue=[[from.x,from.y,[]]],seen=new Set([`${from.x},${from.y}`]),steps=[['up',0,-1],['down',0,1],['left',-1,0],['right',1,0]];while(queue.length){const [x,y,path]=queue.shift();if(goal(x,y))return path;for(const [direction,dx,dy] of steps){const nx=x+dx,ny=y+dy,key=`${nx},${ny}`;if(!seen.has(key)&&['grass','path','bridge'].includes(cell(nx,ny))){seen.add(key);queue.push([nx,ny,[...path,direction]]);}}}throw new Error('No journey route exists');};
+  const nextState=async before=>waitFor(()=>stateVersion>before);
+  const send=async value=>{await wait(170);const before=stateVersion;socket.send(JSON.stringify(value));return nextState(before);};
+  const near=async target=>{const from=position(),path=route(from,(x,y)=>Math.abs(x-target.x)+Math.abs(y-target.y)<=1);for(const direction of path)await send({type:'move',direction});};
+  const action=type=>send({type});
+  try{
+    await connect();await waitFor(()=>!!lastState);
+    const object=id=>welcomeState.objects.find(item=>item.id===id),creature=id=>lastState.creatures.find(item=>item.id===id);
+    await near(object('keeper'));await action('interact');if(lastState.journey.quest!=='active')throw new Error('Mara did not start the First Echo');
+    await near(object('herb-a'));await action('interact');await near(object('herb-b'));await action('interact');if(lastState.journey.inventory.dewleaf!==2)throw new Error('Journey did not gather two dewleaf');
+    await near(object('stone'));await action('interact');if(!lastState.discoveries.includes('stone'))throw new Error('Journey did not discover the stone');
+    for(const creatureId of ['moss-1','moss-2']){await near(creature(creatureId));await action('attack');while(lastState.journey.battle)await action('attack');}
+    if(lastState.journey.inventory.shard!==2)throw new Error('Journey did not earn two echo shards');
+    await near(object('keeper'));await action('interact');if(lastState.journey.quest!=='complete')throw new Error('Journey did not complete the First Echo');
+    await near(creature('warden'));await action('attack');while(lastState.journey.battle)await action('guard');
+    const defeated=position();if(lastState.journey.deaths!==1||defeated.x!==3||defeated.y!==10)throw new Error('Defeat did not restore the micro-world safe anchor');
+    socket.close();await once(socket,'close');await connect(cookie);await waitFor(()=>!!lastState);
+    const restored=position();if(lastState.journey.quest!=='complete'||lastState.journey.deaths!==1||restored.x!==3||restored.y!==10)throw new Error('Reconnect did not restore the completed journey');
+    return {quest:lastState.journey.quest,deaths:lastState.journey.deaths,spawn:{x:restored.x,y:restored.y},discoveries:lastState.discoveries,historyKinds:['quest_started','quest_completed','defeat']};
+  }finally{if(socket&&socket.readyState===WebSocket.OPEN){socket.close();await once(socket,'close').catch(()=>{});}}
+}
 
 const port=await freePort(),base=`http://127.0.0.1:${port}`,data=await mkdtemp(join(tmpdir(),'living-world-micro-lab-'));
 let server,browser;
@@ -24,6 +52,7 @@ try{
   if(protocol.width!==18||protocol.height!==14)throw new Error(`Micro fixture dimensions changed: ${protocol.width}×${protocol.height}`);
   if(!protocol.objects.some(object=>object.id==='keeper')||!protocol.objects.some(object=>object.id==='stone'))throw new Error('Micro fixture lost its narrative anchors');
   const movement=await exerciseMovement(base.replace('http','ws')+'/world',base);
+  const journey=await playJourney(base.replace('http','ws')+'/world',base);
 
   browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1280,height:800},deviceScaleFactor:1,reducedMotion:'reduce'});
   await page.goto(base,{waitUntil:'networkidle'});
@@ -45,7 +74,7 @@ try{
   if(!metrics.buttons.includes('Interact'))failed.push('primary interaction control is absent');
   if(metrics.horizontalOverflow)failed.push('page has horizontal overflow at the reference viewport');
   await mkdir(output,{recursive:true});await page.screenshot({path:join(output,'micro-world.png'),fullPage:true});
-  const report={version:1,capturedAt:new Date().toISOString(),fixture:'micro',realm:{base,layout:`${protocol.width}x${protocol.height}`,objects:protocol.objects.map(object=>object.id),serverAuthoritativeMove:movement},browser:{engine:'playwright-chromium',viewport:'1280x800',reducedMotion:true},metrics,checks:{passed:failed.length===0,failed},artifacts:{screenshot:'outputs/world-lab/micro/micro-world.png'},candidateExecution:'blocked: Windows Sandbox/container isolation is not configured; this trusted-baseline harness never runs saved AI candidate code on the host.',nextAutonomousQuestion:'Inspect the actual micro-world capture and report. Choose one focused, falsifiable visual, interaction or encounter improvement only after candidate execution is available in a disposable runtime.'};
+  const report={version:2,capturedAt:new Date().toISOString(),fixture:'micro',realm:{base,layout:`${protocol.width}x${protocol.height}`,objects:protocol.objects.map(object=>object.id),serverAuthoritativeMove:movement,journey},browser:{engine:'playwright-chromium',viewport:'1280x800',reducedMotion:true},metrics,checks:{passed:failed.length===0,failed},artifacts:{screenshot:'outputs/world-lab/micro/micro-world.png'},candidateExecution:'blocked: Windows Sandbox/container isolation is not configured; this trusted-baseline harness never runs saved AI candidate code on the host.',nextAutonomousQuestion:'Inspect the actual micro-world capture and report. Choose one focused, falsifiable visual, interaction or encounter improvement only after candidate execution is available in a disposable runtime.'};
   await writeFile(join(output,'report.json'),JSON.stringify(report,null,2));
   if(failed.length)throw new Error(`Micro World Lab failed: ${failed.join('; ')}`);
   console.log('LW_MICRO_WORLD_LAB_OK');console.log(JSON.stringify(report));

@@ -10,6 +10,7 @@
 | Owner boundary | Admin, auth, redaction and secret-handling tests | The Lab cannot proceed as a valid owner control plane. |
 | Candidate boundary | Developer isolation, account limits and visual-release tests | A candidate must remain a proposal. |
 | Micro Realm contract | 18×14 topology, narrative anchors, spawn and authoritative move | The compact stage no longer represents a playable journey. |
+| Journey persistence | WebSocket path completes First Echo, survives defeat, reconnects at the safe anchor and retains quest history | A core state transition, recovery path or saved journey regressed. |
 | Browser smoke | Chromium connects, renders, accepts input and fits the reference viewport | The real client cannot present the stage reliably. |
 | Visual floor | Color count, opaque coverage, luminance range and canvas label | The scene is blank, unreadable or inaccessible. |
 | Evidence | Timestamped JSON report and screenshot | A run cannot be compared or handed to a developer. |
@@ -28,7 +29,6 @@ Candidate HTTP/WebSocket/browser execution, arbitrary source release, balance co
 
 ## Next gates
 
-- deterministic journey replay: well → Mara → dewleaf → encounter → retreat/defeat;
 - keyboard-only and narrow-viewport browser checks;
 - screenshot comparison with semantic regions rather than brittle pixel matching;
 - encounter outcome distributions across fixed random seeds;

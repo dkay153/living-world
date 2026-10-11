@@ -15,6 +15,7 @@
     "admin:open": "node scripts/admin-open.js",
     "admin:prepare": "node scripts/admin-open.js --prepare",
     "godot:check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/godot-check.ps1",
+    "contracts:check": "node scripts/validate-contracts.js",
     "lab:micro": "node scripts/micro-world-lab.js",
     "lab:full": "npm test && npm run lab:micro"
   },

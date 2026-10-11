@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "id": "micro-world-core",
+  "title": "Micro World core exploration-to-encounter journey",
+  "playerPromise": "A new traveler can explore a small shared place, choose an interaction or encounter command, recover from defeat and retain the resulting history.",
+  "category": "vertical_slice_fixture",
+  "affectedStateGroups": [
+    "player.identity",
+    "player.location",
+    "player.vitality",
+    "player.inventory",
+    "encounter",
+    "quest_and_dialogue",
+    "world.topology",
+    "world.entities",
+    "world.history",
+    "presentation",
+    "protocol",
+    "persistence"
+  ],
+  "authorities": ["realm", "connection", "content_release"],
+  "intents": ["move", "interact", "attack", "guard", "heal", "retreat"],
+  "invariants": [
+    "The client never chooses a final position, encounter outcome, reward or recovery location.",
+    "A defeated traveler returns to a reachable safe anchor with their durable history preserved.",
+    "Item consumption and rewards retain authoritative event provenance.",
+    "A browser can show the world and primary controls without horizontal overflow at the reference viewport."
+  ],
+  "presentation": [
+    "The map has a nonblank, readable canvas representation and an accessible label.",
+    "Encounter controls expose Strike, Guard, Dewleaf and Retreat when legally available.",
+    "Vitality and recovery feedback are player-visible."
+  ],
+  "validation": [
+    "Authoritative gameplay, combat, persistence and WebSocket tests.",
+    "Disposable Realm/browser World Lab journey and screenshot report.",
+    "Defeat, reconnect and respawn regression coverage."
+  ],
+  "recovery": "The fixture runs on disposable data. Persistent production changes require a versioned migration, backup and restore route.",
+  "retirement": "Keep a compatible archived fixture or migrate player state before removing a referenced map, quest or item definition."
+}
