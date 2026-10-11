@@ -20,6 +20,8 @@ Godot 4.7.2 is now installed as the local client toolchain. The first text-first
 
 `npm run lab:micro` runs the first actual browser/Realm micro-world harness on disposable data, captures a scene and writes its structured evidence beneath `outputs/world-lab/micro/`. See [the Micro World Lab](docs/MICRO_WORLD_LAB.md).
 
+`npm run lab:full` is the local quality gate: the complete gameplay, persistence, security and developer suite followed by the disposable Realm/browser Lab. Its outputs are evidence for review, never permission to release general source code.
+
 ## Windows localhost
 Requires Node.js 22.18 or later in the 22.x line. The current machine has 22.23.3.
 
