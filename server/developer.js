@@ -42,18 +42,18 @@ export function createDeveloper({store,dataDir,projectDir=resolve('.'),clock=Dat
     catch{isolationRetryAt=clock()+120000;sandbox={ok:false,checkedAt:clock(),error:'Isolation check failed; execution is blocked'};audit('developer_isolation_failed');throw bad('Isolation check failed. Developer execution stays blocked.');}finally{checking=false;}
   }
   async function saveConfig(input){
-    const {enabled,model,dailyRuns,dailyMinutes,maxMinutes}=input;
+    const {enabled,model,maxMinutes}=input;
     if(typeof enabled!=='boolean')throw bad('Choose whether developer execution is enabled');
     if(model!==null&&(typeof model!=='string'||!/^[-a-zA-Z0-9_.:]{1,120}$/.test(model)))throw bad('Select an exact Codex model');
-    for(const [name,value,max] of [['dailyRuns',dailyRuns,100],['dailyMinutes',dailyMinutes,600],['maxMinutes',maxMinutes,60]])if(value!==null&&(!Number.isInteger(value)||value<1||value>max))throw bad(`Invalid ${name} limit`);
+    if(!Number.isInteger(maxMinutes)||maxMinutes<1||maxMinutes>1440)throw bad('Set a 1–1,440 minute task watchdog');
     if(enabled){
       await refresh();if(!statusCache.connected)throw bad('Connect a ChatGPT Codex account first');
       if(!catalogCache.some(m=>m.id===model))throw bad('Select a model returned by this account');
-      if(!dailyRuns||!dailyMinutes||!maxMinutes||maxMinutes>dailyMinutes)throw bad('Set a daily run limit, daily time allowance and per-task time limit');
+      if(!maxMinutes)throw bad('Set a task watchdog');
       if(!sandbox?.ok)throw bad('Verify isolation before enabling developer tasks');
     }
     if(active)active.abort.abort();
-    transaction(()=>{control.set('developer',{enabled,model,dailyRuns,dailyMinutes,maxMinutes});audit('developer_settings_saved',{enabled,model,dailyRuns,dailyMinutes,maxMinutes});});return status();
+    transaction(()=>{control.set('developer',{enabled,model,dailyRuns:null,dailyMinutes:null,maxMinutes});audit('developer_settings_saved',{enabled,model,maxMinutes,localAllowance:'unlimited'});});return status();
   }
   async function enqueue(input,origin='owner',context=null){
     if(typeof input.requestKey!=='string'||!/^[-a-zA-Z0-9]{16,80}$/.test(input.requestKey))throw bad('A unique task request is required');
@@ -63,8 +63,6 @@ export function createDeveloper({store,dataDir,projectDir=resolve('.'),clock=Dat
     await refresh();if(!statusCache.connected)throw bad('Reconnect the ChatGPT Codex account');
     c=config();if(!c.enabled)throw bad('Developer execution is paused');
     return transaction(()=>{
-      const daily=db.prepare('SELECT COUNT(*) AS runs,COALESCE(SUM(max_minutes),0) AS minutes FROM developer_runs WHERE created_at>=?').get(dayStart(clock()));
-      if(daily.runs>=c.dailyRuns||daily.minutes+c.maxMinutes>c.dailyMinutes)throw bad('The local daily task allowance is exhausted');
       const id=queue.enqueue('codex_development',{task:input.task.trim(),model:c.model},'codex:'+input.requestKey,1);
       db.prepare("INSERT INTO developer_runs(id,request_key,task,model,max_minutes,state,created_at,origin,context) VALUES (?,?,?,?,?,'queued',?,?,?)").run(id,input.requestKey,input.task.trim(),c.model,c.maxMinutes,clock(),origin,context?JSON.stringify(context):null);audit('developer_task_queued',{id,model:c.model});return {id};
     });
@@ -143,7 +141,6 @@ export function createDeveloper({store,dataDir,projectDir=resolve('.'),clock=Dat
     try{
       if(clock()-connectedAt>30000)await refresh(false);if(!statusCache?.connected||active.abort.signal.aborted||!config().enabled||!catalogCache.some(m=>m.id===c.model))return;
       if((limitsCache||[]).some(g=>[g.primary,g.secondary].some(w=>w&&w.usedPercent>=100&&w.resetsAt*1000>clock())))return;
-      const used=usage();if(used.runs>=c.dailyRuns||used.reservedMinutes+c.maxMinutes>c.dailyMinutes)return;
       if(autonomy.ready()){
         const context=autonomy.evidence();
         await enqueue({requestKey:'autonomous-'+randomUUID(),task:'Choose and complete the single most useful improvement from the observed evidence, current game and previous outcomes. Prioritize player agency, exploration, command-driven encounters, visual readability, operational reliability and coherent behavior-based history. Avoid cosmetic churn, duplicate proposals and invented conclusions. Make one focused change with a falsifiable hypothesis. Visual data can be automatically published; code changes remain proposals until the protected runtime exists.'},'autonomous',context);

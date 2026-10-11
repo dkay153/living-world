@@ -23,11 +23,11 @@ async function harness(fn,{executor}={}) {
   try{await fn({dir,dataDir,store,dev,enable,calls,advance:ms=>now+=ms});}finally{await dev.close();store.db.close();await rm(dir,{recursive:true,force:true});}
 }
 const task={requestKey:'test-request-key-0001',task:'Improve encounter readability while preserving turn-based commands.'};
-test('developer requires owner model, allowances and isolation; provider API settings stay disabled',async()=>harness(async({dev,enable,store})=>{
+test('developer requires an owner model, watchdog and isolation; provider API settings stay disabled',async()=>harness(async({dev,enable,store})=>{
   assert.equal(dev.status().config.enabled,false);assert.equal(settings(store.db).ai().modelCallsEnabled,false);
   await assert.rejects(()=>dev.enqueue(task),/configure/);
   await assert.rejects(()=>dev.saveConfig({enabled:true,model:'made-up-model',dailyRuns:2,dailyMinutes:4,maxMinutes:2}),/returned by this account/);
-  await assert.rejects(()=>dev.saveConfig({enabled:true,model:'owner-selected-codex',dailyRuns:null,dailyMinutes:4,maxMinutes:2}),/Set a daily/);
+  await assert.rejects(()=>dev.saveConfig({enabled:true,model:'owner-selected-codex',maxMinutes:0}),/watchdog/);
   await enable();assert.equal(dev.status().config.model,'owner-selected-codex');assert.equal(settings(store.db).ai().modelCallsEnabled,false);
 }));
 test('account job records changes and checks without altering the live source or copying state',async()=>harness(async({dev,enable,store,calls,dataDir})=>{
@@ -39,8 +39,8 @@ test('account job records changes and checks without altering the live source or
   assert.equal(store.db.prepare('SELECT attempts FROM jobs WHERE id=?').get(first.id).attempts,1);assert.equal(dev.status().usage.reservedMinutes,2);
   assert.ok(store.db.prepare("SELECT 1 FROM admin_audit WHERE action='developer_candidate_completed'").get());
 }));
-test('daily allowances reserve full task duration and cannot be exceeded by new requests',async()=>harness(async({dev,enable})=>{
-  await enable({dailyRuns:1,dailyMinutes:2});await dev.enqueue(task);await assert.rejects(()=>dev.enqueue({...task,requestKey:'test-request-key-0002'}),/exhausted/);await dev.tick();assert.equal(dev.status().usage.runs,1);
+test('local task quotas do not block a second queued repair',async()=>harness(async({dev,enable})=>{
+  await enable({dailyRuns:1,dailyMinutes:2});await dev.enqueue(task);await dev.enqueue({...task,requestKey:'test-request-key-0002'});await dev.tick();assert.equal(dev.status().usage.runs,1);
 }));
 test('interrupted developer leases are terminal, pause execution and require an explicit new attempt',async()=>harness(async({dev,enable,store,advance})=>{
   await enable();const {id}=await dev.enqueue(task),q=createQueue(store.db,()=>1791628800000),claim=q.claim(['codex_development'],45000);assert.equal(claim.id,id);
@@ -71,14 +71,14 @@ test('developer migration rollback preserves schema 4 and old history',async()=>
   try{migrate(db);db.exec("INSERT INTO players VALUES('historic',9,12);DROP TABLE developer_lessons;DROP TABLE visual_releases;DROP TABLE developer_runs;PRAGMA user_version=4;CREATE TABLE developer_runs(id TEXT);");assert.throws(()=>migrate(db),/already exists/);assert.equal(db.prepare('PRAGMA user_version').get().user_version,4);assert.equal(db.prepare('SELECT x FROM players').get().x,9);db.exec('DROP TABLE developer_runs');migrate(db);assert.equal(db.prepare('PRAGMA user_version').get().user_version,SCHEMA_VERSION);}finally{db.close();await rm(dir,{recursive:true,force:true});}
 });
 
-test('self-directed work uses the existing account allowance, carries outcomes and publishes only validated art data',async()=>harness(async({dev,enable,store,advance})=>{
+test('self-directed work carries outcomes and publishes only validated art data without a local daily quota',async()=>harness(async({dev,enable,store,advance})=>{
   await enable();dev.saveAutonomy({enabled:true,intervalMinutes:30,automaticVisuals:true});
   const original=settings(store.db).ai(),live=await readFile('public/art.json');
   await dev.tick();const status=dev.status();assert.equal(status.runs.length,1);assert.equal(status.runs[0].origin,'autonomous');assert.ok(status.visuals.active);
   const report=await dev.report(status.runs[0].id);assert.equal(report.report.liveRelease,true);assert.equal(report.report.release.state,'published');assert.equal(status.autonomy.lessons[0].outcome,'visual_published');
   assert.deepEqual(settings(store.db).ai(),original);assert.deepEqual(await readFile('public/art.json'),live);await dev.tick();assert.equal(dev.status().runs.length,1);
   advance(30*60000);await dev.tick();assert.equal(dev.status().runs.length,2);const latest=store.db.prepare("SELECT context FROM developer_runs ORDER BY created_at DESC LIMIT 1").get();assert.ok(JSON.parse(latest.context).outcomes.length);
-  advance(30*60000);await dev.tick();assert.equal(dev.status().runs.length,2);dev.rollbackVisuals();assert.equal(dev.status().autonomy.config.automaticVisuals,false);
+  advance(30*60000);await dev.tick();assert.equal(dev.status().runs.length,3);dev.rollbackVisuals();assert.equal(dev.status().autonomy.config.automaticVisuals,false);
 },{executor:async(binary,args,options)=>{
   if(args[0]==='exec'){const candidate=args[args.indexOf('-C')+1],pack=JSON.parse(await readFile(join(candidate,'public/art.json'),'utf8'));pack.name='Original dusk visual experiment';pack.palette.grass='#597047';await writeFile(join(candidate,'public/art.json'),JSON.stringify(pack));await writeFile(join(candidate,'development-result.json'),JSON.stringify({title:'Dusk palette',hypothesis:'Terrain may become more coherent',expectedOutcome:'Readable original terrain',validation:'Compare scenes; artistic claim unverified',nextStep:'Observe feedback'}));}
   return {code:0,stdout:'Checks passed',timedOut:false,cancelled:false,overflow:false};

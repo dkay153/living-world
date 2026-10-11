@@ -20,7 +20,7 @@ export function createAutonomy(store,clock=Date.now){
   }
   function ready(){const s=status();return s.config.enabled&&!s.circuitOpen&&clock()>=s.nextAt&&!db.prepare("SELECT 1 FROM developer_runs WHERE state IN ('queued','running')").get();}
   function save(input){
-    if(typeof input.enabled!=='boolean'||typeof input.automaticVisuals!=='boolean'||!Number.isInteger(input.intervalMinutes)||input.intervalMinutes<15||input.intervalMinutes>1440)throw Object.assign(new Error('Set autonomy, visual releases and a 15–1440 minute interval'),{status:400});
+    if(typeof input.enabled!=='boolean'||typeof input.automaticVisuals!=='boolean'||!Number.isInteger(input.intervalMinutes)||input.intervalMinutes<1||input.intervalMinutes>1440)throw Object.assign(new Error('Set autonomy, visual releases and a 1–1,440 minute interval'),{status:400});
     control.set('autonomy',{enabled:input.enabled,automaticVisuals:input.automaticVisuals,intervalMinutes:input.intervalMinutes});
     db.prepare('INSERT INTO admin_audit(action,details) VALUES (?,?)').run('autonomy_settings_saved',JSON.stringify(input));return status();
   }

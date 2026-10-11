@@ -27,6 +27,6 @@ test('three consecutive execution failures open the circuit; evidence distinguis
 test('dossier contains aggregate observations without guest bearer IDs or secret tables',()=>{
   const {db,a}=fixture();try{db.prepare('INSERT INTO players VALUES (?,1,2)').run('private-bearer-1234');db.prepare('INSERT INTO owner_secrets VALUES (?,?)').run('apiKey','private-provider-secret');
     const text=JSON.stringify(a.evidence());assert.ok(!text.includes('private-bearer'));assert.ok(!text.includes('private-provider-secret'));assert.equal(a.evidence().counts.players,1);
-    assert.throws(()=>a.save({enabled:true,intervalMinutes:1,automaticVisuals:true}),/15–1440/);
+    assert.doesNotThrow(()=>a.save({enabled:true,intervalMinutes:1,automaticVisuals:true}));
   }finally{db.close();}
 });
