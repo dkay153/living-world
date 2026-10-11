@@ -4,6 +4,8 @@ Persistent local 2D RPG foundation. Read [the baseline plan](docs/BASELINE.md) f
 
 The [day one quality requirements](docs/DAY_ONE.md) define the stricter evidence, compatibility, evaluation and recovery gates for each autonomous capability.
 
+The [autonomous studio blueprint](docs/AUTONOMOUS_STUDIO.md) turns those principles into the full set of creative, engineering, testing and operations capabilities the steward needs, with a dependency-ordered build path.
+
 ## Windows localhost
 Requires Node.js 22.18 or later in the 22.x line. The current machine has 22.23.3.
 
