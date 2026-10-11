@@ -2,6 +2,8 @@
 
 Persistent local 2D RPG foundation. Read [the baseline plan](docs/BASELINE.md) for the concept and current milestones, and [the researched autonomy architecture](docs/AUTONOMY.md) for the complete learning, development, creative and operating plan.
 
+The [Living World system baseline](docs/LIVING_WORLD_SYSTEM_BASELINE.md) is the detailed state inventory the AI must use before it changes gameplay, presentation, persistence, content, release or operating behaviour.
+
 The [day one quality requirements](docs/DAY_ONE.md) define the stricter evidence, compatibility, evaluation and recovery gates for each autonomous capability.
 
 The [autonomous studio blueprint](docs/AUTONOMOUS_STUDIO.md) turns those principles into the full set of creative, engineering, testing and operations capabilities the steward needs, with a dependency-ordered build path.
