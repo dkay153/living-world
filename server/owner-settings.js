@@ -17,8 +17,8 @@ export function createSecretStore(db,dataDir) {
   }
   const key=readFileSync(path);if(key.length!==32)throw new Error('Invalid credential encryption key');
   return {
-    configured(){return !!db.prepare("SELECT 1 FROM owner_secrets WHERE key='openai'").get();},
-    save(value){const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key,iv);const body=Buffer.concat([cipher.update(value,'utf8'),cipher.final()]);const sealed=JSON.stringify({iv:iv.toString('base64'),tag:cipher.getAuthTag().toString('base64'),body:body.toString('base64')});db.prepare("INSERT INTO owner_secrets VALUES ('openai',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(sealed);},
-    read(){const row=db.prepare("SELECT value FROM owner_secrets WHERE key='openai'").get();if(!row)return null;const data=JSON.parse(row.value);const decipher=createDecipheriv('aes-256-gcm',key,Buffer.from(data.iv,'base64'));decipher.setAuthTag(Buffer.from(data.tag,'base64'));return Buffer.concat([decipher.update(Buffer.from(data.body,'base64')),decipher.final()]).toString('utf8');}
+    configured(name='openai'){return !!db.prepare('SELECT 1 FROM owner_secrets WHERE key=?').get(name);},
+    save(value,name='openai'){const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key,iv);const body=Buffer.concat([cipher.update(value,'utf8'),cipher.final()]);const sealed=JSON.stringify({iv:iv.toString('base64'),tag:cipher.getAuthTag().toString('base64'),body:body.toString('base64')});db.prepare('INSERT INTO owner_secrets VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(name,sealed);},
+    read(name='openai'){const row=db.prepare('SELECT value FROM owner_secrets WHERE key=?').get(name);if(!row)return null;const data=JSON.parse(row.value);const decipher=createDecipheriv('aes-256-gcm',key,Buffer.from(data.iv,'base64'));decipher.setAuthTag(Buffer.from(data.tag,'base64'));return Buffer.concat([decipher.update(Buffer.from(data.body,'base64')),decipher.final()]).toString('utf8');}
   };
 }

@@ -17,7 +17,7 @@ If classification is uncertain, use the more conservative class. The developer m
 
 ## 2. Required record
 
-Every candidate begins with `change-plan.json` and ends with a result record. The plan names the affected code and interfaces, invariants, removals, validation and rollback. The result names what actually changed, checks run, observation window and remaining uncertainty.
+Every candidate begins with `change-plan.json`, `state-impact.json` and `evolution-review.json`, then ends with a result record. The plan names the affected code and interfaces, invariants, removals, validation and rollback. The evolution review names the baseline, primary variable, guardrails, no-change case, observation window and stop signals. The result names what actually changed, checks run, observation window and remaining uncertainty. See [evolution governance](EVOLUTION_GOVERNANCE.md).
 
 The agent checks the complete dependency path, not only files it edits: caller → server contract → persistence → client controls → browser rendering → tests → operator documentation. Replacement code is incomplete while obsolete callers, labels, flags, docs or tests remain.
 

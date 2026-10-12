@@ -55,13 +55,15 @@ try{
   const journey=await playJourney(base.replace('http','ws')+'/world',base);
 
   browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1280,height:800},deviceScaleFactor:1,reducedMotion:'reduce'});
-  await page.goto(base,{waitUntil:'networkidle'});
+  await page.goto(base+'/legacy/',{waitUntil:'networkidle'});
   await page.waitForFunction(()=>document.querySelector('#connection')?.textContent==='WORLD ONLINE');
   await page.locator('#world').click();await page.keyboard.press('ArrowRight');await wait(250);
   const metrics=await page.evaluate(()=>{
     const canvas=document.querySelector('#world'),ctx=canvas.getContext('2d',{willReadFrequently:true}),pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data,colors=new Set();let opaque=0,luminanceMin=255,luminanceMax=0;
     for(let i=0;i<pixels.length;i+=4){if(pixels[i+3]){opaque++;colors.add(`${pixels[i]},${pixels[i+1]},${pixels[i+2]}`);const l=Math.round(.2126*pixels[i]+.7152*pixels[i+1]+.0722*pixels[i+2]);luminanceMin=Math.min(luminanceMin,l);luminanceMax=Math.max(luminanceMax,l);}}
-    return {canvas:{width:canvas.width,height:canvas.height,aria:canvas.getAttribute('aria-label')},colors:colors.size,opaqueRatio:opaque/(canvas.width*canvas.height),luminanceRange:luminanceMax-luminanceMin,connection:document.querySelector('#connection')?.textContent,buttons:[...document.querySelectorAll('button')].map(button=>button.textContent.trim()),horizontalOverflow:document.documentElement.scrollWidth>document.documentElement.clientWidth};
+    const screen=document.querySelector('.world'),screenBox=screen.getBoundingClientRect(),gameState=['#vitality','#inventory','#discoveries','#quest','#attack','#heal','#personal-journal','#chronicle','#notice','#interact'].map(selector=>document.querySelector(selector)).filter(Boolean),stateSurfaces=gameState.map(node=>node.closest('.player-hud,.game-panel,#notice,.controls')||node);
+    const gameStateInWorld=stateSurfaces.every(surface=>{const box=surface.getBoundingClientRect();return screen.contains(surface)&&box.left>=screenBox.left-1&&box.right<=screenBox.right+1&&box.top>=screenBox.top-1&&box.bottom<=screenBox.bottom+1;});
+    return {canvas:{width:canvas.width,height:canvas.height,aria:canvas.getAttribute('aria-label')},colors:colors.size,opaqueRatio:opaque/(canvas.width*canvas.height),luminanceRange:luminanceMax-luminanceMin,connection:document.querySelector('#connection')?.textContent,buttons:[...document.querySelectorAll('button')].map(button=>button.textContent.trim()),horizontalOverflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,gameStateInWorld,externalSidebars:document.querySelectorAll('aside').length};
   });
   const failed=[];
   if(metrics.connection!=='WORLD ONLINE')failed.push('client did not reach the Realm');
@@ -73,6 +75,7 @@ try{
   if(metrics.luminanceRange<70)failed.push(`scene lacks readable luminance range (${metrics.luminanceRange})`);
   if(!metrics.buttons.includes('Interact'))failed.push('primary interaction control is absent');
   if(metrics.horizontalOverflow)failed.push('page has horizontal overflow at the reference viewport');
+  if(!metrics.gameStateInWorld||metrics.externalSidebars)failed.push('player state escaped the game screen');
   await mkdir(output,{recursive:true});await page.screenshot({path:join(output,'micro-world.png'),fullPage:true});
   const report={version:2,capturedAt:new Date().toISOString(),fixture:'micro',realm:{base,layout:`${protocol.width}x${protocol.height}`,objects:protocol.objects.map(object=>object.id),serverAuthoritativeMove:movement,journey},browser:{engine:'playwright-chromium',viewport:'1280x800',reducedMotion:true},metrics,checks:{passed:failed.length===0,failed},artifacts:{screenshot:'outputs/world-lab/micro/micro-world.png'},candidateExecution:'blocked: Windows Sandbox/container isolation is not configured; this trusted-baseline harness never runs saved AI candidate code on the host.',nextAutonomousQuestion:'Inspect the actual micro-world capture and report. Choose one focused, falsifiable visual, interaction or encounter improvement only after candidate execution is available in a disposable runtime.'};
   await writeFile(join(output,'report.json'),JSON.stringify(report,null,2));

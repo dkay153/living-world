@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --background: oklch(0.145 0.012 255);
+  --foreground: oklch(0.955 0.01 255);
+  --card: oklch(0.19 0.014 255);
+  --card-foreground: oklch(0.955 0.01 255);
+  --popover: oklch(0.19 0.014 255);
+  --popover-foreground: oklch(0.955 0.01 255);
+  --primary: oklch(0.78 0.12 158);
+  --primary-foreground: oklch(0.18 0.025 158);
+  --secondary: oklch(0.245 0.014 255);
+  --secondary-foreground: oklch(0.94 0.01 255);
+  --muted: oklch(0.245 0.014 255);
+  --muted-foreground: oklch(0.69 0.02 255);
+  --accent: oklch(0.26 0.018 255);
+  --accent-foreground: oklch(0.96 0.01 255);
+  --destructive: oklch(0.64 0.19 25);
+  --border: oklch(0.3 0.015 255);
+  --input: oklch(0.3 0.015 255);
+  --ring: oklch(0.78 0.12 158);
+  --radius: 0.625rem;
+}
+
+* { box-sizing: border-box; }
+html, body { min-height: 100%; margin: 0; }
+body { background: var(--background); color: var(--foreground); font-family: Arial, Helvetica, sans-serif; }
+button, input, textarea { font: inherit; }
+button { cursor: pointer; }
+
+/* The player world remains a separate in-game surface. */
+.world-shell { min-height: 100vh; background: #070d0a; }
+.world-top { position: fixed; z-index: 4; top: 0; right: 0; left: 0; display: flex; align-items: center; gap: 14px; height: 44px; padding: 0 16px; border-bottom: 1px solid #284333; background: rgb(8 17 12 / 92%); backdrop-filter: blur(10px); }
+.brand { display: flex; align-items: center; gap: 8px; color: #eef7f0; font-size: 14px; font-weight: 700; text-decoration: none; }
+.brand-mark { display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid #4c8f68; border-radius: 7px; color: #91e6b1; }
+.world-mode, .world-top .quiet-link { display: flex; align-items: center; gap: 6px; color: #a9c9b4; font-size: 11px; }
+.world-top .quiet-link { margin-left: auto; color: #9fe1b7; text-decoration: none; }
+.world-stage { height: 100vh; min-height: 640px; overflow: hidden; }
+.legacy-world { width: 100%; height: 100%; border: 0; background: #07110c; }
+.chronicle { position: fixed; z-index: 3; top: 58px; right: 16px; width: min(330px, calc(100% - 32px)); overflow: hidden; border: 1px solid #475d4a; border-radius: 9px; background: rgb(13 21 16 / 94%); backdrop-filter: blur(10px); }
+.chronicle-toggle { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 11px; border: 0; background: transparent; color: #eaf3dd; text-align: left; font-size: 12px; font-weight: 700; }
+.chronicle-toggle svg:last-child { margin-left: auto; transition: transform .2s; }
+.chronicle.open .chronicle-toggle svg:last-child { transform: rotate(180deg); }
+.chronicle-inner { max-height: 310px; overflow: auto; padding: 0 11px 11px; }
+.chronicle .message { margin: 8px 0; }
+.world-prompt { position: fixed; z-index: 3; bottom: 14px; left: 50%; display: flex; align-items: center; gap: 7px; max-width: calc(100% - 24px); padding: 8px 11px; overflow: hidden; border: 1px solid #4c614d; border-radius: 99px; background: rgb(16 24 17 / 94%); color: #d7e8cf; font-size: 11px; white-space: nowrap; text-overflow: ellipsis; transform: translateX(-50%); }
+
+@media (max-width: 900px) {
+  .world-mode { display: none; }
+  .chronicle { right: 10px; top: 52px; }
+}
+.studio-chat-scroll [data-stick-to-bottom-scroll] { scrollbar-width: thin; scrollbar-color: color-mix(in oklch, var(--primary) 42%, transparent) transparent; }
+.studio-chat-scroll [data-stick-to-bottom-scroll]::-webkit-scrollbar { width: 8px; }
+.studio-chat-scroll [data-stick-to-bottom-scroll]::-webkit-scrollbar-track { background: transparent; }
+.studio-chat-scroll [data-stick-to-bottom-scroll]::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: color-mix(in oklch, var(--primary) 48%, transparent); background-clip: padding-box; }
+.studio-chat-scroll [data-stick-to-bottom-scroll]::-webkit-scrollbar-thumb:hover { background: color-mix(in oklch, var(--primary) 72%, transparent); background-clip: padding-box; }
+
+.studio-chat-scroll, .studio-chat-scroll > * { overflow-x: hidden !important; }
+.studio-chat-scroll > * { scrollbar-width: thin; scrollbar-color: color-mix(in oklch, var(--primary) 42%, transparent) transparent; }
+.studio-chat-scroll > *::-webkit-scrollbar { width: 8px; height: 0; }
+.studio-chat-scroll > *::-webkit-scrollbar-track { background: transparent; }
+.studio-chat-scroll > *::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: color-mix(in oklch, var(--primary) 48%, transparent); background-clip: padding-box; }
+
+/* Keep every Studio overflow surface native-dark and unobtrusive. */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in oklch, var(--primary) 38%, var(--background)) var(--background); }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: var(--background); }
+*::-webkit-scrollbar-thumb { border: 2px solid var(--background); border-radius: 999px; background: color-mix(in oklch, var(--primary) 52%, var(--background)); }
+*::-webkit-scrollbar-corner { background: var(--background); }

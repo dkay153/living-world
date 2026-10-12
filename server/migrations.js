@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 export function migrate(db) {
   const version = db.prepare('PRAGMA user_version').get().user_version;
   if (version > SCHEMA_VERSION) throw new Error('Database is newer than this release; refusing to downgrade it.');
@@ -82,6 +82,19 @@ export function migrate(db) {
       BEGIN SELECT RAISE(ABORT,'Release artifacts are immutable'); END;
       CREATE TRIGGER visual_release_no_delete BEFORE DELETE ON visual_releases
       BEGIN SELECT RAISE(ABORT,'Release history is retained'); END;
+    `);
+    if(version<7)db.exec(`
+      CREATE TABLE agent_messages(
+        id TEXT PRIMARY KEY, speaker TEXT NOT NULL CHECK(speaker IN ('owner','agent','system')),
+        kind TEXT NOT NULL CHECK(kind IN ('direction','finding','status')),
+        body TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('stored','queued','working','completed','observation_required','blocked','failed')),
+        run_id TEXT REFERENCES developer_runs(id), evidence TEXT NOT NULL DEFAULT '{}', created_at INTEGER NOT NULL
+      );
+      CREATE INDEX agent_messages_recent ON agent_messages(created_at DESC,id DESC);
+      CREATE TRIGGER agent_messages_no_update BEFORE UPDATE OF speaker,kind,body,evidence,created_at ON agent_messages
+      BEGIN SELECT RAISE(ABORT,'Studio messages are append-only'); END;
+      CREATE TRIGGER agent_messages_no_delete BEFORE DELETE ON agent_messages
+      BEGIN SELECT RAISE(ABORT,'Studio messages are retained'); END;
     `);
     db.exec(`PRAGMA user_version=${SCHEMA_VERSION}; COMMIT;`);
   } catch (error) { db.exec('ROLLBACK'); throw error; }

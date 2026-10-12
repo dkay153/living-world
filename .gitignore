@@ -4,4 +4,8 @@ backups/
 .env
 *.log
 work/
+outputs/
+ui/.next/
+ui/out/
 client-godot/.godot/
+ui/tsconfig.tsbuildinfo

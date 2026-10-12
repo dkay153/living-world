@@ -45,11 +45,11 @@ test('corrupt active artifacts automatically restore the previous valid version'
     assert.equal(v.read().hash,r.hash);assert.equal(v.status().history.find(x=>x.id===second.id).state,'rolled_back');
   }finally{db.close();}
 });
-test('schema six failure rolls back new columns and preserves existing history',()=>{
+test('schema six and later failure rolls back new columns and preserves existing history',()=>{
   const db=new DatabaseSync(':memory:');migrate(db);try{
-    db.exec("DROP TABLE developer_lessons;DROP TABLE visual_releases;ALTER TABLE developer_runs DROP COLUMN context;ALTER TABLE developer_runs DROP COLUMN origin;PRAGMA user_version=5;CREATE TABLE visual_releases(id TEXT);INSERT INTO players VALUES('old-player',9,12)");
+    db.exec("DROP TABLE agent_messages;DROP TABLE developer_lessons;DROP TABLE visual_releases;ALTER TABLE developer_runs DROP COLUMN context;ALTER TABLE developer_runs DROP COLUMN origin;PRAGMA user_version=5;CREATE TABLE visual_releases(id TEXT);INSERT INTO players VALUES('old-player',9,12)");
     assert.throws(()=>migrate(db),/already exists/);assert.equal(db.prepare('PRAGMA user_version').get().user_version,5);assert.ok(!db.prepare('PRAGMA table_info(developer_runs)').all().some(c=>c.name==='origin'));assert.equal(db.prepare('SELECT x FROM players').get().x,9);
-    db.exec('DROP TABLE visual_releases');migrate(db);assert.equal(db.prepare('PRAGMA user_version').get().user_version,6);
+    db.exec('DROP TABLE visual_releases');migrate(db);assert.equal(db.prepare('PRAGMA user_version').get().user_version,7);
   }finally{db.close();}
 });
 

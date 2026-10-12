@@ -14,7 +14,7 @@ test('real server validates origin, persists identity, and shares player positio
   async function connect(base,cookie){const ws=new WebSocket(base.replace('http','ws')+'/world',{origin:base,headers:cookie?{Cookie:cookie}:{}});sockets.push(ws);const messages=[];let identity;ws.on('upgrade',r=>identity=r.headers['set-cookie']?.[0].split(';')[0]);ws.on('message',raw=>messages.push(JSON.parse(raw)));await once(ws,'open');await wait(()=>messages.some(m=>m.type==='welcome'));return {ws,messages,cookie:identity||cookie};}
   async function wait(fn){for(let i=0;i<100;i++){if(fn())return;await new Promise(r=>setTimeout(r,20));}throw new Error('Timed out');}
   try{
-    let base=await launch();assert.ok(base);assert.equal((await (await fetch(base+'/healthz')).json()).ok,true);
+    let base=await launch();assert.ok(base);assert.equal((await (await fetch(base+'/healthz')).json()).ok,true);const shell=await fetch(base+'/?studio=1');assert.equal(shell.status,200);assert.match(await shell.text(),/legacy-world/);const embedded=await fetch(base+'/legacy/?studio=1');assert.equal(embedded.status,200);assert.match(await embedded.text(),/id="world"/);
     const blocked=new WebSocket(base.replace('http','ws')+'/world',{origin:'http://untrusted.invalid'});blocked.on('error',()=>{});await new Promise(r=>blocked.on('close',r));
     const a=await connect(base),b=await connect(base);await wait(()=>a.messages.some(m=>m.type==='state'&&m.players.length===2));
     const welcome=a.messages.find(m=>m.type==='welcome');

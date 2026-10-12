@@ -26,6 +26,20 @@ flowchart LR
 
 Every arrow has to produce a durable artifact. A task without a hypothesis becomes busywork. A candidate without a playable staging environment is an unverified patch. A release without a recovery path is a gamble. A lesson without source evidence is only a claim.
 
+## Studio conversation: Ask, Plan, and Agent
+
+The owner-facing chat is the studio's control surface, not a decorative activity log. It must preserve a clean difference between a question, planning context, and a request to act:
+
+| Mode | Owner intent | Host behavior | What the transcript must show |
+| --- | --- | --- | --- |
+| **Ask** | Investigate a scene, evidence record, design trade-off, or result | Retain the question as durable context; do not enqueue source work | The question, the scope it informs, and an honest statement that no task was started |
+| **Plan** | State an outcome, constraints, non-goals, and protected behavior | Retain structured planning context; do not enqueue source work | A collapsible plan card with its status and the future task it can inform |
+| **Agent** | Give one bounded task to the autonomous developer | Include recent Ask/Plan context as data and queue only when the configured account and isolated runtime are ready | Live phase narration, durable evidence, validation outcome, release eligibility, and an exact blocker when no task can start |
+
+The composer must make the selected mode visible before send, offer context-aware examples, and describe the consequence of submission. It must never make an owner believe that an Ask or Plan secretly altered code, nor imply that a blocked Agent request is running. Model messages, tool calls, and internal chain of thought are not the evidence transcript. The host should translate real phase transitions into **intent**, **current work**, **next signal**, and **completion condition**. This is why AI Elements' composable `PromptInput`, `Plan`, `Queue`, `Reasoning`, `Message`, `Shimmer`, and `WebPreview` primitives fit the Studio: each represents a visible type of interaction without inventing hidden state. [AI Elements documentation](https://elements.ai-sdk.dev/docs) and its [Plan component reference](https://elements.ai-sdk.dev/docs/components/plan) describe those composable building blocks.
+
+An active task may shimmer while the host receives new milestones, but a shimmer is never a completion estimate. A completed task produces a normal final message; a running World Lab refreshes only when a host-validated visual release exists. General candidate source remains isolated until the protected staging/promotion lane can prove browser, persistence, migration, and recovery behavior.
+
 The team roles below describe responsibilities, not permanent independent accounts. One bounded developer can initially execute several roles in sequence. Separate accounts, processes and permissions only where a hand-off protects the game: candidate execution, production promotion, owner access, credentials and constitutional enforcement.
 
 ## The roles, their tools and their definition of done

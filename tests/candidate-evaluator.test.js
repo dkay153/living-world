@@ -4,7 +4,8 @@ import { evaluateCandidate } from '../server/candidate-evaluator.js';
 
 const checks={passed:true,discipline:{passed:true}};
 test('only a validated art artifact can enter the narrow visual-release lane',()=>{
-  assert.equal(evaluateCandidate({changes:[{path:'public/art.json'}],checks}).state,'visual_data_eligible');
+  assert.equal(evaluateCandidate({changes:[{path:'public/art.json'}],checks}).state,'observation_required');
+  assert.equal(evaluateCandidate({changes:[{path:'public/art.json'}],checks,evolution:{automaticRelease:true,reason:'Baseline and stop signals are recorded'}}).state,'visual_data_eligible');
   assert.equal(evaluateCandidate({changes:[{path:'server/game.js'}],checks}).state,'proposal_retained');
   assert.equal(evaluateCandidate({changes:[{path:'development-result.json'}],checks}).state,'no_change');
 });

@@ -16,6 +16,7 @@ const planningWorkspace=args=>args[args.indexOf('-C')+1].endsWith('planning');
 async function writePlan(directory,{groups=['presentation','encounter'],files=['public/new-visual.txt'],goal='Improve encounter readability'}={}){
   await writeFile(join(directory,'change-plan.json'),JSON.stringify({goal,affectedFiles:files,invariants:['Turn-based encounter remains'],removals:[],validation:['offline tests']}));
   await writeFile(join(directory,'state-impact.json'),JSON.stringify({goal,affectedStateGroups:groups,affectedFiles:files,invariants:['Turn-based encounter remains'],validation:['offline tests'],recovery:['Discard candidate']}));
+  await writeFile(join(directory,'evolution-review.json'),JSON.stringify({mode:'autonomous',problem:'A focused quality opportunity was identified',evidence:['Trusted World Lab evidence will be checked before release'],baseline:{signals:[{name:'World Lab baseline',status:'available',detail:'A deterministic journey capture is the comparison point'}]},hypothesis:'One focused change can improve the identified surface without harming protected journeys.',scope:{primaryVariable:goal,cohort:'Players using the affected surface',reversibility:'reversible'},guardrails:['Preserve protected identity','Retain a prior visual version'],observation:{successSignals:['World Lab remains healthy'],stopSignals:['World Lab regression'],window:'Next World Lab capture'},noChangeCase:'Retain the current version when evidence does not support this change'}));
 }
 
 async function harness(fn,{executor}={}) {
@@ -74,7 +75,7 @@ test('sign-in links must use the supported OpenAI authority; only sanitized acco
 });
 test('developer migration rollback preserves schema 4 and old history',async()=>{
   const dir=await mkdtemp(join(tmpdir(),'lw-developer-migration-')),db=new DatabaseSync(join(dir,'world.sqlite'));
-  try{migrate(db);db.exec("INSERT INTO players VALUES('historic',9,12);DROP TABLE developer_lessons;DROP TABLE visual_releases;DROP TABLE developer_runs;PRAGMA user_version=4;CREATE TABLE developer_runs(id TEXT);");assert.throws(()=>migrate(db),/already exists/);assert.equal(db.prepare('PRAGMA user_version').get().user_version,4);assert.equal(db.prepare('SELECT x FROM players').get().x,9);db.exec('DROP TABLE developer_runs');migrate(db);assert.equal(db.prepare('PRAGMA user_version').get().user_version,SCHEMA_VERSION);}finally{db.close();await rm(dir,{recursive:true,force:true});}
+  try{migrate(db);db.exec("INSERT INTO players VALUES('historic',9,12);DROP TABLE agent_messages;DROP TABLE developer_lessons;DROP TABLE visual_releases;DROP TABLE developer_runs;PRAGMA user_version=4;CREATE TABLE developer_runs(id TEXT);");assert.throws(()=>migrate(db),/already exists/);assert.equal(db.prepare('PRAGMA user_version').get().user_version,4);assert.equal(db.prepare('SELECT x FROM players').get().x,9);db.exec('DROP TABLE developer_runs');migrate(db);assert.equal(db.prepare('PRAGMA user_version').get().user_version,SCHEMA_VERSION);}finally{db.close();await rm(dir,{recursive:true,force:true});}
 });
 
 test('self-directed work carries outcomes and publishes only validated art data without a local daily quota',async()=>harness(async({dev,enable,store,advance})=>{
@@ -89,6 +90,14 @@ test('self-directed work carries outcomes and publishes only validated art data 
   if(args[0]==='exec'){const candidate=args[args.indexOf('-C')+1];if(planningWorkspace(args))await writePlan(candidate,{groups:['presentation'],files:['public/art.json'],goal:'Improve terrain coherence'});else{const pack=JSON.parse(await readFile(join(candidate,'public/art.json'),'utf8'));pack.name='Original dusk visual experiment';pack.palette.grass='#597047';await writeFile(join(candidate,'public/art.json'),JSON.stringify(pack));await writeFile(join(candidate,'development-result.json'),JSON.stringify({title:'Dusk palette',hypothesis:'Terrain may become more coherent',expectedOutcome:'Readable original terrain',validation:'Compare scenes; artistic claim unverified',nextStep:'Observe feedback'}));}}
   return {code:0,stdout:'Checks passed',timedOut:false,cancelled:false,overflow:false};
 }}));
+test('self-directed work receives bounded Ask and Plan context as data',async()=>harness(async({dev,enable,store})=>{
+  store.db.prepare("INSERT INTO agent_messages(id,speaker,kind,body,status,evidence,created_at) VALUES ('ask','owner','direction','Is the current command bar readable at game scale?','stored',?,1)").run(JSON.stringify({source:'owner',interaction:'ask',treatedAs:'data'}));
+  store.db.prepare("INSERT INTO agent_messages(id,speaker,kind,body,status,evidence,created_at) VALUES ('plan','owner','direction','Preserve command-driven encounters while improving readability.','stored',?,2)").run(JSON.stringify({source:'owner',interaction:'plan',treatedAs:'data'}));
+  await enable();dev.saveAutonomy({enabled:true,intervalMinutes:30,automaticVisuals:false});await dev.tick();
+  const context=JSON.parse(store.db.prepare("SELECT context FROM developer_runs WHERE origin='autonomous' LIMIT 1").get().context);
+  assert.deepEqual(context.ownerStudioGuidance.map(entry=>entry.mode),['ask','plan']);
+  assert.match(context.guidanceBoundary,/untrusted planning data/);
+}));
 test('failed candidate checks never publish art and record an empirical failure rather than a model success claim',async()=>harness(async({dev,enable})=>{
   await enable();dev.saveAutonomy({enabled:true,intervalMinutes:30,automaticVisuals:true});await dev.tick();assert.equal(dev.status().visuals.active,null);assert.equal(dev.status().autonomy.lessons[0].outcome,'checks_failed');
 },{executor:async(binary,args,options)=>{

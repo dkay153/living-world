@@ -10,25 +10,40 @@ import { createSteward } from './steward.js';
 import { personalJournal } from './memory.js';
 import { createAdmin } from './admin.js';
 import { SCHEMA_VERSION } from './migrations.js';
-const host=process.env.HOST || '127.0.0.1', port=Number(process.env.PORT || 3000);
+const host=process.env.HOST || '127.0.0.1', port=Number(process.env.PORT || 3000), publicOrigin=process.env.PUBLIC_ORIGIN||`http://${host}:${port}`;
 const dataDir=resolve(process.env.DATA_DIR || 'data');
 const store=openStore(resolve(dataDir,'world.sqlite'));
 const game=createGame(store);
 const steward=createSteward(store);
 const sessions=new Map(), peers=new Map();
-const admin=createAdmin({store,steward,dataDir,backupDir:resolve(process.env.BACKUP_DIR||'backups'),online:()=>peers.size});
-const publicFiles={'/':['index.html','text/html'], '/style.css':['style.css','text/css'], '/seed.js':['seed.js','text/javascript']};
+const admin=createAdmin({store,steward,dataDir,backupDir:resolve(process.env.BACKUP_DIR||'backups'),publicOrigin,online:()=>peers.size});
+const publicRoot=new URL('../public/',import.meta.url),uiRoot=new URL('../ui/out/',import.meta.url);
+const publicFiles={'/':['index.html','text/html',uiRoot], '/legacy/':['index.html','text/html',publicRoot], '/style.css':['style.css','text/css',publicRoot], '/seed.js':['seed.js','text/javascript',publicRoot]};
+const contentType=path=>path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':path.endsWith('.json')?'application/json':path.endsWith('.svg')?'image/svg+xml':path.endsWith('.png')?'image/png':path.endsWith('.woff2')?'font/woff2':'application/octet-stream';
 const server=http.createServer(async(req,res)=>{
+  const requestUrl=new URL(req.url,`http://${req.headers.host||'localhost'}`),path=requestUrl.pathname;
   res.setHeader('X-Content-Type-Options','nosniff');
-  res.setHeader('Content-Security-Policy',"default-src 'self'; connect-src 'self'; style-src 'self'; script-src 'self'; frame-ancestors 'none'");
+  // The React game shell and the disposable World Lab both embed the same-origin game surface.
+  const frameAncestors=process.env.STUDIO_EMBED_ORIGIN?`'self' ${process.env.STUDIO_EMBED_ORIGIN}`:"'self'";
+  const studioFrame=path==='/admin'||path==='/admin/'?"; frame-src 'self' http://127.0.0.1:*":'';
+  res.setHeader('Content-Security-Policy',`default-src 'self'; connect-src 'self'; style-src 'self'; script-src 'self' 'unsafe-inline'; frame-ancestors ${frameAncestors}${studioFrame}`);
   res.setHeader('Cache-Control','no-store');
   res.setHeader('Referrer-Policy','no-referrer');
   if(await admin.handle(req,res))return;
-  if(req.url==='/art.json'&&req.method==='GET') {res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify(admin.developer.visuals.read()));}
-  if(req.url==='/healthz') { res.writeHead(200,{'Content-Type':'application/json'}); return res.end(JSON.stringify({ok:store.db.prepare('SELECT 1').get()!=null,version:'0.5.0',schemaVersion:SCHEMA_VERSION,memoryWorker:steward.status().paused?'paused':'enabled',modelCallsEnabled:false})); }
-  const file=publicFiles[req.url];
+  if(path==='/art.json'&&req.method==='GET') {
+    let art=admin.developer.visuals.read();
+    if(process.env.LW_ART_FILE){try{art=JSON.parse(await readFile(process.env.LW_ART_FILE,'utf8'));}catch{/* Keep the last valid in-memory baseline if the Lab artifact is unavailable. */}}
+    res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify(art));
+  }
+  if(path==='/healthz') { res.writeHead(200,{'Content-Type':'application/json'}); return res.end(JSON.stringify({ok:store.db.prepare('SELECT 1').get()!=null,version:'0.5.0',schemaVersion:SCHEMA_VERSION,memoryWorker:steward.status().paused?'paused':'enabled',modelCallsEnabled:false})); }
+  if(path.startsWith('/_next/')){
+    const file=new URL('.'+path,uiRoot);
+    if(!file.pathname.startsWith(uiRoot.pathname)){res.writeHead(404);return res.end('Not found');}
+    try{const data=await readFile(file);res.writeHead(200,{'Content-Type':contentType(path)});return res.end(data);}catch{res.writeHead(404);return res.end('Not found');}
+  }
+  const file=publicFiles[path];
   if(!file || req.method!=='GET'){res.writeHead(404);return res.end('Not found');}
-  try { const data=await readFile(new URL('../public/'+file[0],import.meta.url)); res.writeHead(200,{'Content-Type':file[1]});res.end(data); }
+  try { const data=await readFile(new URL(file[0],file[2])); res.writeHead(200,{'Content-Type':file[1]});res.end(data); }
   catch {res.writeHead(500);res.end('Unavailable');}
 });
 const wss=new WebSocketServer({noServer:true,maxPayload:1024});
@@ -71,5 +86,5 @@ function runMemory(){try{steward.tick();}catch(e){console.error('memory_worker_f
 runMemory();const memoryWorker=setInterval(runMemory,2000);
 function runDeveloper(){admin.developer.tick().catch(()=>console.error('developer_worker_failed'));}
 const developerWorker=setInterval(runDeveloper,2000);
-async function stop(){clearInterval(heartbeat);clearInterval(memoryWorker);clearInterval(developerWorker);await admin.developer.close();for(const ws of peers.keys())ws.close(1001,'Server stopping');wss.close();server.close(()=>{store.db.close();process.exit(0);});setTimeout(()=>process.exit(1),5000).unref();}
+async function stop(){clearInterval(heartbeat);clearInterval(memoryWorker);clearInterval(developerWorker);await admin.close();for(const ws of peers.keys())ws.close(1001,'Server stopping');wss.close();server.close(()=>{store.db.close();process.exit(0);});setTimeout(()=>process.exit(1),5000).unref();}
 process.on('SIGINT',stop);process.on('SIGTERM',stop);

@@ -76,7 +76,7 @@ test('failed owner migration rolls back new tables and preserves the prior world
   const dir=mkdtempSync(join(tmpdir(),'lw-admin-migration-')),db=new DatabaseSync(join(dir,'world.sqlite'));
   try{
     migrate(db);db.exec(`INSERT INTO players VALUES ('historic',9,12);INSERT INTO events(player,kind,subject) VALUES ('historic','discovery','stone');
-      DROP TABLE developer_lessons;DROP TABLE visual_releases;DROP TABLE developer_runs;DROP TABLE owner_tickets;DROP TABLE owner_sessions;DROP TABLE owner_secrets;DROP TABLE admin_audit;
+      DROP TABLE agent_messages;DROP TABLE developer_lessons;DROP TABLE visual_releases;DROP TABLE developer_runs;DROP TABLE owner_tickets;DROP TABLE owner_sessions;DROP TABLE owner_secrets;DROP TABLE admin_audit;
       PRAGMA user_version=3;`);
     // An unexpected pre-existing table simulates an interrupted/invalid migration prerequisite.
     assert.throws(()=>migrate(db),/owner_settings.*already exists/);
@@ -94,4 +94,11 @@ test('retry accepts only failed local jobs; proposal decisions leave a durable a
  assert.equal((await request('jobs/retry',{id})).status,200);assert.equal(store.db.prepare('SELECT state FROM jobs WHERE id=?').get(id).state,'queued');assert.equal((await request('jobs/retry',{id})).status,400);
  store.db.prepare("INSERT INTO improvements VALUES ('p','p','gameplay','Check balance','{}','proposed',0)").run();assert.equal((await request('proposals',{id:'p',status:'accepted'})).status,200);assert.equal(store.db.prepare("SELECT status FROM improvements WHERE id='p'").get().status,'accepted');
  assert.equal((await request('proposals',{id:'p',status:'completed'})).status,400);assert.ok(store.db.prepare("SELECT 1 FROM admin_audit WHERE action='proposal_status'").get());
+}));
+
+test('AI connection registry seals provider keys and keeps every provider runtime disabled',async()=>harness(async({store,request,login,dir})=>{
+  await login();const catalog=await (await request('connections')).json();assert.ok(catalog.connections.some(connection=>connection.id==='codex'&&connection.status==='available'));assert.ok(catalog.connections.some(connection=>connection.id==='google'));assert.ok(catalog.connections.some(connection=>connection.id==='openrouter'));
+  const key='google-test-key-never-sent';const response=await request('connections/google',{authMode:'Authorization key',endpoint:'https://generativelanguage.googleapis.com/v1beta',model:'gemini-test',apiKey:key});assert.equal(response.status,200);const saved=await response.json();assert.equal(saved.execution,'disabled');assert.ok(!JSON.stringify(saved).includes(key));assert.equal(createSecretStore(store.db,dir).read('connection:google'),key);
+  const listed=await (await request('connections')).json();const google=listed.connections.find(connection=>connection.id==='google');assert.equal(google.secretConfigured,true);assert.equal(google.configuration.model,'gemini-test');assert.equal(google.execution,'disabled');assert.ok(!JSON.stringify(listed).includes(key));
+  assert.equal((await request('connections/openai-compatible',{endpoint:'http://127.0.0.1:11434',model:'local'})).status,400);
 }));
