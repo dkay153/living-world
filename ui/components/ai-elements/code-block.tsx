@@ -28,6 +28,7 @@ import type {
   ThemedToken,
 } from "shiki";
 import { createHighlighter } from "shiki";
+import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
 // oxlint-disable-next-line eslint(no-bitwise)
@@ -156,6 +157,9 @@ const getHighlighter = (
   }
 
   const highlighterPromise = createHighlighter({
+    // Application integration: keep the registry presentation while honoring
+    // the project's CSP, which intentionally disallows WASM evaluation.
+    engine: createJavaScriptRegexEngine(),
     langs: [language],
     themes: ["github-light", "github-dark"],
   });

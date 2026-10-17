@@ -6,6 +6,13 @@ import { join } from 'node:path';
 import { openStore } from '../server/store.js';
 import { createStudioChat } from '../server/studio-chat.js';
 
+test('Ask queues a read-only conversation with the ready saved account, while Plan remains context',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'lw-studio-ask-')),store=openStore(join(dir,'world.sqlite'));try{
+  let calls=0;const developer={status:()=>({config:{enabled:true,model:'saved-model'},models:[{id:'saved-model'}],connection:{connected:true},sandbox:{ok:true},limits:[],runs:[]}),enqueue:async(input,origin)=>{calls++;assert.equal(origin,'owner_question');store.db.prepare("INSERT INTO jobs(id,kind,input,unique_key,created_at,available_at) VALUES ('question','codex_development','{}','question-fixture',1000,1000)").run();store.db.prepare("INSERT INTO developer_runs(id,request_key,task,model,max_minutes,state,created_at) VALUES ('question',?,?,'saved-model',1,'queued',1000)").run(input.requestKey,input.task);return {id:'question'};}};
+  const studio=createStudioChat({store,developer,clock:()=>1000});const reply=await studio.post({mode:'ask',body:'What does the Warden recovery turn do?'});assert.equal(reply.posted.queued,true);await studio.post({mode:'plan',body:'Keep saved progress safe.'});assert.equal(calls,1);assert.equal(studio.status().messages.find(m=>m.speaker==='owner'&&m.evidence.interaction==='ask').run_id,'question');
+ }finally{store.db.close();await rm(dir,{recursive:true,force:true});}
+});
+
 test('owner direction is retained when the autonomous developer is unavailable',async()=>{
   const dir=await mkdtemp(join(tmpdir(),'lw-studio-')),store=openStore(join(dir,'world.sqlite'));
   try{
@@ -60,4 +67,12 @@ test('developer activity becomes one durable transcript event per real state cha
     activity.phase='Checking project account';activity.narration='The host is checking account state.';
     assert.equal(studio.status().messages.filter(message=>message.evidence.source==='developer_activity').length,2);
   }finally{store.db.close();await rm(dir,{recursive:true,force:true});}
+});
+
+test('paused questions keep the suspended task; Agent follow-up resumes that exact task',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'lw-paused-studio-')),store=openStore(join(dir,'world.sqlite'));let asked=0,resumed=0;
+ for(const id of ['answer','continued']){store.db.prepare("INSERT INTO jobs(id,kind,input,unique_key,created_at,available_at) VALUES (?,'codex_development','{}',?,1000,1000)").run(id,id);store.db.prepare("INSERT INTO developer_runs(id,request_key,task,model,max_minutes,state,created_at) VALUES (?,?,'fixture','saved',1,'queued',1000)").run(id,id);}
+ const target={id:'earlier-task',task:'Improve encounters',state:'cancelled'};
+ const developer={status:()=>({config:{enabled:false,model:'saved'},models:[{id:'saved'}],connection:{connected:true},sandbox:{ok:true},limits:[],runs:[{id:'newer-question'}],resumeTarget:target}),enqueue:async(input,origin,context)=>{asked++;assert.equal(origin,'owner_question');assert.deepEqual(context.suspendedTask,target);return {id:'answer'};},resumeRun:async input=>{resumed++;assert.equal(input.id,'earlier-task');assert.equal(input.text,'Continue the earlier task');return {id:'continued'};}};
+ try{const studio=createStudioChat({store,developer});assert.equal(studio.status().ready,false);assert.equal(studio.status().questionReady,true);assert.equal((await studio.post({mode:'ask',body:'What remains?'})).posted.queued,true);assert.equal(asked,1);assert.equal(resumed,0);assert.equal((await studio.post({mode:'agent',body:'Continue the earlier task'})).posted.queued,true);assert.equal(resumed,1);assert.equal(asked,1);assert.equal(developer.status().config.enabled,false);}finally{store.db.close();await rm(dir,{recursive:true,force:true});}
 });

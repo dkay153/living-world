@@ -18,7 +18,10 @@ test('real server validates origin, persists identity, and shares player positio
     const blocked=new WebSocket(base.replace('http','ws')+'/world',{origin:'http://untrusted.invalid'});blocked.on('error',()=>{});await new Promise(r=>blocked.on('close',r));
     const a=await connect(base),b=await connect(base);await wait(()=>a.messages.some(m=>m.type==='state'&&m.players.length===2));
     const welcome=a.messages.find(m=>m.type==='welcome');
-    a.ws.send(JSON.stringify({type:'move',direction:'teleport',x:23,y:5}));await new Promise(r=>setTimeout(r,150));
+    a.ws.send(JSON.stringify({type:'move',direction:'teleport',x:23,y:5}));
+    // TCP ordering makes pong a server-side processing barrier; client-side
+    // sleep alone can queue both messages together on a busy Windows host.
+    const processed=once(a.ws,'pong');a.ws.ping();await processed;await new Promise(r=>setTimeout(r,150));
     a.ws.send(JSON.stringify({type:'move',direction:'up'}));await wait(()=>a.messages.some(m=>m.type==='state'&&m.players.find(p=>p.id===welcome.id)?.y===11));
     await new Promise(r=>setTimeout(r,150));a.ws.send(JSON.stringify({type:'move',direction:'left'}));await wait(()=>a.messages.some(m=>m.type==='state'&&m.players.find(p=>p.id===welcome.id)?.x===8));
     await new Promise(r=>setTimeout(r,150));a.ws.send(JSON.stringify({type:'interact'}));await wait(()=>a.messages.some(m=>m.type==='state'&&m.discoveries.includes('well')));

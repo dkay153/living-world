@@ -1,4 +1,5 @@
 import { settings } from './owner-settings.js';
+import { developmentCapabilities } from './development-capabilities.js';
 
 export const autonomyDefaults={enabled:false,intervalMinutes:30,automaticVisuals:false};
 export function createAutonomy(store,clock=Date.now){
@@ -10,7 +11,11 @@ export function createAutonomy(store,clock=Date.now){
     const outcomes=db.prepare('SELECT run_id,outcome,finding,evidence,created_at FROM developer_lessons ORDER BY created_at DESC,rowid DESC LIMIT 8').all().map(l=>({...l,evidence:JSON.parse(l.evidence)}));
     const counts=Object.fromEntries(['players','events','item_instances','memories'].map(t=>[t,db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n]));
     const events=db.prepare('SELECT kind,COUNT(*) AS count FROM events GROUP BY kind').all();
-    return {version:1,capturedAt:clock(),counts,eventCounts:events,proposals,outcomes,limits:'Aggregate observations are evidence, not proof of causation. Model hypotheses are unverified until measured.'};
+    const proposalTotal=db.prepare("SELECT COUNT(*) AS n FROM improvements WHERE status IN ('proposed','accepted')").get().n;
+    const outcomeTotal=db.prepare('SELECT COUNT(*) AS n FROM developer_lessons').get().n;
+    return {version:1,capturedAt:clock(),counts,eventCounts:events,proposals,outcomes,
+      coverage:{scope:'Aggregate world facts; no personal dossiers',proposals:{returned:proposals.length,total:proposalTotal,truncated:proposalTotal>proposals.length},outcomes:{returned:outcomes.length,total:outcomeTotal,truncated:outcomeTotal>outcomes.length}},
+      development:developmentCapabilities(),limits:'Aggregate observations are evidence, not proof of causation. Model hypotheses are unverified until measured.'};
   }
   function status(){
     const c=config(),last=db.prepare("SELECT created_at FROM developer_runs WHERE origin='autonomous' ORDER BY created_at DESC LIMIT 1").get();

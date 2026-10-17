@@ -1,86 +1,21 @@
-import { createServer } from 'node:net';
-import { spawn } from 'node:child_process';
-import { once } from 'node:events';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { chromium } from '@playwright/test';
-import { openStore } from '../server/store.js';
-import { createOwnerTicket } from '../server/owner-auth.js';
-
-const root=resolve('.');
-const output=resolve('outputs','world-lab','admin');
-const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-async function freePort(){return new Promise((resolve,reject)=>{const server=createServer();server.once('error',reject);server.listen(0,'127.0.0.1',()=>{const {port}=server.address();server.close(error=>error?reject(error):resolve(port));});});}
-async function until(check,message){for(let attempt=0;attempt<80;attempt++){try{if(await check())return;}catch{/* server starts asynchronously */}await wait(100);}throw new Error(message);}
-
-const port=await freePort(),base=`http://127.0.0.1:${port}`,data=await mkdtemp(join(tmpdir(),'living-world-admin-lab-'));
-let server,browser;
+// Trusted checkout regression Lab. Run retained candidates only in the contained release lane.
+import {createServer} from 'node:net';import {spawn} from 'node:child_process';import {once} from 'node:events';import {mkdtemp,mkdir,rm,writeFile} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join,resolve} from 'node:path';import {chromium} from '@playwright/test';import assert from 'node:assert/strict';import {openStore} from '../server/store.js';import {createOwnerTicket} from '../server/owner-auth.js';
+const output=resolve(process.env.LW_ADMIN_LAB_OUTPUT||'outputs/world-lab/admin');const data=await mkdtemp(join(tmpdir(),'lw-admin-regression-'));let server,browser;
 try{
-  server=spawn(process.execPath,['server/index.js'],{cwd:root,env:{...process.env,HOST:'127.0.0.1',PORT:String(port),DATA_DIR:data,BACKUP_DIR:join(data,'backups'),PUBLIC_ORIGIN:base},stdio:['ignore','pipe','pipe'],windowsHide:true});
-  let stderr='';server.stderr.on('data',chunk=>stderr+=chunk);
-  await until(async()=>{const response=await fetch(`${base}/healthz`);return response.ok;},`Admin Lab did not become healthy: ${stderr.slice(-1000)}`);
-  const store=openStore(join(data,'world.sqlite'));let ticket;try{ticket=createOwnerTicket(store.db);}finally{store.db.close();}
-  browser=await chromium.launch({headless:true});
-  const page=await browser.newPage({viewport:{width:1280,height:800},deviceScaleFactor:1,reducedMotion:'reduce'});
-  page.setDefaultTimeout(8000);
-  await page.goto(`${base}/admin#ticket=${encodeURIComponent(ticket)}`,{waitUntil:'domcontentloaded'});
-  await page.getByRole('heading',{name:'Studio conversation'}).waitFor();
-  const failures=[];
-  if(!await page.getByRole('link',{name:'Open world'}).count())failures.push('player-world entry point is absent');
-  if(!await page.getByRole('tab',{name:'Conversation'}).count())failures.push('conversation tab is absent');
-  if(!await page.getByText('Codex',{exact:true}).count())failures.push('agent identity is absent');
-  await page.getByRole('tab',{name:'Evidence'}).click();
-  await page.getByRole('heading',{name:'Evidence'}).waitFor();
-  await page.getByText('Current development context',{exact:true}).waitFor();
-  await page.getByRole('tab',{name:'Operations'}).click();
-  await page.getByRole('heading',{name:'Operations'}).waitFor();
-  await page.getByRole('button',{name:'Create backup'}).waitFor();
-  await page.getByRole('tab',{name:'World data'}).click();
-  await page.getByRole('heading',{name:'World data'}).waitFor();
-  await page.getByText('Read-only, redacted records from the persistent local world.').waitFor();
-  await page.getByRole('tab',{name:'Charter'}).click();
-  await page.getByRole('heading',{name:'Charter'}).waitFor();
-  await page.getByRole('button',{name:'Constitution'}).waitFor();
-  await page.getByRole('tab',{name:'Connections'}).click();
-  await page.getByRole('heading',{name:'Connections'}).waitFor();
-  if(!await page.getByText('Codex CLI',{exact:true}).count())failures.push('Codex connection is absent');
-  if(!await page.getByText('Claude Code',{exact:true}).count())failures.push('Claude Code connection is absent');
-  if(!await page.getByText('OpenRouter',{exact:true}).count())failures.push('OpenRouter connection is absent');
-  await page.getByRole('button',{name:'Switch connection'}).click();
-  await page.getByPlaceholder('Find a connection...').waitFor();
-  await page.getByRole('listbox',{name:'Suggestions'}).getByText('Google Gemini',{exact:true}).click();
-  await page.keyboard.press('Escape');
-  await page.getByText('Google Gemini',{exact:true}).first().waitFor();
-  await page.getByRole('tab',{name:'Conversation'}).click();
-  await page.getByRole('heading',{name:'Studio conversation'}).waitFor();
-  await mkdir(output,{recursive:true});
-  await page.screenshot({path:join(output,'developer-controls.png'),fullPage:true});
-  await page.getByRole('button',{name:'Start Lab'}).first().click();
-  await page.locator('iframe[title="Current-source disposable world"]').waitFor();
-  await page.screenshot({path:join(output,'lab-loading.png'),fullPage:true});
-  const labSource=await page.locator('iframe[title="Current-source disposable world"]').getAttribute('src');
-  const labResponse=labSource?await fetch(labSource):null;
-  if(!labResponse?.ok)throw new Error(`World Lab frame did not respond: ${labSource||'missing frame source'}`);
-  const labCanvas=page.frameLocator('iframe[title="Current-source disposable world"]').locator('#world');
-  await labCanvas.waitFor({timeout:15000});
-  if(!await labCanvas.evaluate(canvas=>canvas.ownerDocument.documentElement.classList.contains('studio-embed')))throw new Error('World Lab compact shell did not activate');
-  await until(async()=>labCanvas.evaluate(canvas=>{const pixels=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;for(let index=0;index<pixels.length;index+=64)if(pixels[index]||pixels[index+1]||pixels[index+2])return true;return false;}),'World Lab map did not render');
-  const direction='Observe the first encounter and retain it unless the World Lab shows a real issue.';
-  await page.locator('textarea').fill(direction);
-  await page.locator('form').last().evaluate(form=>form.requestSubmit());
-  await page.getByText(direction,{exact:true}).waitFor();
-  const studioBody=await page.locator('body').innerText();
-  if(!studioBody.includes('A living operator transcript for questions, planning context, and isolated autonomous work.'))failures.push('studio does not explain the live developer conversation');
-  if(!studioBody.includes('Ask')||!studioBody.includes('Plan')||!studioBody.includes('Agent'))failures.push('studio does not expose the three composer modes');
-  if(!studioBody.includes('Refreshes after a verified visual release'))failures.push('studio does not show the running review sandbox');
-  await page.screenshot({path:join(output,'studio.png'),fullPage:true});
-  const report={version:4,capturedAt:new Date().toISOString(),viewport:'1280x800',checks:{passed:failures.length===0,failed:failures},artifacts:{studioScreenshot:'outputs/world-lab/admin/studio.png'}};
-  await writeFile(join(output,'report.json'),JSON.stringify(report,null,2));
-  if(failures.length)throw new Error(`Admin browser Lab failed: ${failures.join('; ')}`);
-  console.log('LW_ADMIN_BROWSER_LAB_OK');console.log(JSON.stringify(report));
-}finally{
-  await browser?.close();
-  if(server&&!server.killed){server.kill('SIGTERM');await Promise.race([once(server,'exit'),wait(5000)]);if(!server.killed)server.kill('SIGKILL');}
-  await rm(data,{recursive:true,force:true});
-}
+ const probe=createServer();probe.listen(0,'127.0.0.1');await once(probe,'listening');const port=probe.address().port;await new Promise(r=>probe.close(r));const base='http://127.0.0.1:'+port;
+ server=spawn(process.execPath,['server/index.js'],{cwd:resolve('.'),env:{...process.env,HOST:'127.0.0.1',PORT:String(port),DATA_DIR:data,BACKUP_DIR:join(data,'backups'),PUBLIC_ORIGIN:base},stdio:'ignore',windowsHide:true});
+ let healthy=false;for(let i=0;i<150;i++){try{if((await fetch(base+'/healthz')).ok){healthy=true;break;}}catch{}await new Promise(r=>setTimeout(r,100));}assert(healthy,'Private owner fixture did not start');
+ const store=openStore(join(data,'world.sqlite'));let ticket;try{ticket=createOwnerTicket(store.db);}finally{store.db.close();}
+ browser=await chromium.launch({headless:true,chromiumSandbox:process.env.LW_CONTAINED_BROWSER==='1'});const page=await browser.newPage({viewport:{width:1280,height:800},reducedMotion:'reduce'});const errors=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(15000);await page.goto(base+'/admin#ticket='+ticket);await page.getByRole('textbox',{name:'Studio message'}).waitFor();await mkdir(output,{recursive:true});
+ const checks=[];async function view(name){await page.getByRole('tab',{name,exact:true}).click();await page.getByRole('heading',{name,exact:true}).waitFor();checks.push(name+' opens');}
+ await view('Connections');await page.getByRole('heading',{name:'Codex account',exact:true}).waitFor();await page.getByRole('button',{name:'Choose developer model'}).click();await page.getByPlaceholder('Search account models…').fill('unavailable-model');await page.getByText('No matching model in this account.').waitFor();await page.getByRole('button',{name:'Close',exact:true}).click();checks.push('Model search has a real empty state');
+ for(const name of ['Claude Code','OpenAI API','Anthropic API','Google Gemini','Mistral API','OpenRouter','Custom OpenAI-compatible']){await page.getByRole('button',{name:new RegExp('^'+name)}).click();await page.getByText(name==='Claude Code'?'Runner not connected':'World inference disabled',{exact:true}).waitFor();}checks.push('All seven inactive provider panels are honest');
+ await view('Evidence');await page.getByRole('textbox',{name:'Search attempts'}).fill('missing-attempt');await page.getByText('No matching attempts',{exact:true}).waitFor();checks.push('Empty evidence filter is useful');
+ await view('Operations');const game=page.getByRole('region',{name:'Game releases',exact:true});assert(await game.getByRole('button',{name:'Verify protected runtime',exact:true}).isDisabled());assert(await game.getByRole('button',{name:'Restore previous game',exact:true}).isDisabled());await page.screenshot({path:join(output,'operations-desktop.png')});checks.push('Unavailable game cutover and rollback remain disabled');
+ await view('World data');await page.getByRole('combobox',{name:'Record collection'}).click();await page.getByRole('option',{name:'Admin Audit',exact:true}).click();await page.getByRole('button',{name:'Inspect record 1',exact:true}).waitFor();await page.getByRole('button',{name:'Inspect record 1',exact:true}).click();await page.getByRole('dialog').getByRole('heading',{name:'Record details'}).waitFor();await page.getByRole('button',{name:'Close',exact:true}).click();await page.getByRole('textbox',{name:'Search records',exact:true}).fill('no-such-record-999');await page.getByRole('button',{name:'Search records',exact:true}).click();await page.getByText('No records found',{exact:true}).waitFor();checks.push('Read-only records, inspection and server search work');
+ await view('Charter');for(const name of ['Constitution','Memory','Baseline']){await page.getByRole('button',{name:new RegExp('^'+name)}).click();await page.locator('article').getByRole('heading',{level:1}).waitFor();}checks.push('All three project documents load');
+ await page.setViewportSize({width:390,height:844});for(const name of ['Connections','Evidence','Operations','World data','Charter','Conversation','World Lab']){await page.getByRole('tab',{name,exact:true}).click();await page.waitForTimeout(100);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,name+' mobile page overflow');for(const region of await page.getByRole('region').all()){const box=await region.boundingBox();if(box)assert(box.x>=0&&box.x+box.width<=391,name+' clipped panel');}if(name==='World data'){const box=await page.getByRole('textbox',{name:'Search records',exact:true}).boundingBox();assert(box.width>200,'Mobile search field collapsed');}await page.screenshot({path:join(output,name.toLowerCase().replaceAll(' ','-')+'-mobile.png')});}checks.push('All seven views avoid mobile page overflow');
+ await page.getByRole('button',{name:'Start World Lab',exact:true}).click();const frame=page.locator('iframe[title="Current-source disposable world"]');await frame.waitFor({timeout:30000});const lab=page.frameLocator('iframe[title="Current-source disposable world"]');await lab.frameLocator('iframe[title="Living World"]').locator('#world').waitFor({timeout:30000});await page.getByRole('button',{name:'Stop Lab',exact:true}).click();await page.getByText('A world to experiment in',{exact:true}).waitFor();checks.push('Private Lab starts full player page and stops cleanly');
+ await page.getByRole('tab',{name:'Conversation',exact:true}).click();await page.getByRole('button',{name:'Choose Studio mode'}).click();await page.getByRole('menuitem',{name:'Plan',exact:true}).click();await page.getByRole('textbox',{name:'Studio message'}).fill('Retain this private regression plan without inference.');await page.getByRole('button',{name:'Send message',exact:true}).click();await page.getByText('Retain this private regression plan without inference.',{exact:true}).waitFor();checks.push('Composer Plan saves without queuing inference');assert.deepEqual(errors,[]);
+ const report={passed:true,scope:'Trusted current-source UI in a private fixture; no saved account or live player database mounted',checks,errors,at:new Date().toISOString()};await writeFile(join(output,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+}finally{await browser?.close();if(server?.exitCode===null){const ended=once(server,'exit');server.kill('SIGTERM');await Promise.race([ended,new Promise(r=>setTimeout(r,5000))]);if(server.exitCode===null)server.kill('SIGKILL');}await rm(data,{recursive:true,force:true});}

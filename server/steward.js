@@ -21,7 +21,7 @@ export function createSteward(store,clock=Date.now) {
     return {version:1,throughEvent:store.db.prepare('SELECT MAX(id) AS id FROM events').get().id||0,defeatsObserved:defeats.length};
   }
   function tick() {
-    if(control.get('workerPaused',false))return;
+    if(control.get('workerPaused',false)||control.get('sourceLaneOwnsWorld',false))return;
     schedule();
     const slot=Math.floor(clock()/60000);queue.enqueue('inspect_world',{},`inspection:${slot}`);
     // Local deterministic handlers only. A model-backed developer is not running yet.

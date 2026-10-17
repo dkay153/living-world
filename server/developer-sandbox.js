@@ -1,16 +1,17 @@
-import { mkdir,readdir,lstat,readFile,writeFile,copyFile,realpath,unlink } from 'node:fs/promises';
-import { resolve,relative,join,sep } from 'node:path';
+import { mkdir,readdir,lstat,readFile,writeFile,copyFile,realpath,unlink,access } from 'node:fs/promises';
+import { resolve,relative,join,sep,dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { prepareCodexHome,codexEnvironment,codexBinary,runProcess } from './codex-process.js';
+import {canonicalNextTypes} from './next-generated.js';
 
-const roots=['server','public','tests','scripts','docs','config'];
-const topFiles=['AGENTS.md','README.md','package.json','package-lock.json','.gitignore'];
+const roots=['server','public','ui','tests','scripts','docs','config','runtime'];
+const topFiles=['AGENTS.md','README.md','package.json','package-lock.json','.gitignore','start.bat','.agents/skills'];
 const hash=data=>createHash('sha256').update(data).digest('hex');
-const excluded=name=>name.startsWith('.')||['node_modules','data','backups','work','outputs'].includes(name)||/\.(sqlite|db|key|log)$/i.test(name);
+const excluded=name=>name.startsWith('.')||['node_modules','data','backups','work','outputs','out'].includes(name)||/\.(sqlite|db|key|log|tsbuildinfo)$/i.test(name);
 export async function filesUnder(root,{limit=2000,exclude=true}={}) {
   const files=[];let bytes=0;
   async function visit(dir){for(const item of await readdir(dir,{withFileTypes:true})){
-    if(exclude?excluded(item.name):['node_modules','.scratch'].includes(item.name))continue;
+    if(exclude?(excluded(item.name)&&!(item.name==='.agents'&&dir===root)):['node_modules','.scratch'].includes(item.name))continue;
     const path=join(dir,item.name),info=await lstat(path);
     if(info.isSymbolicLink())throw new Error('Symbolic links are not allowed in developer copies');
     if(item.isDirectory())await visit(path);else if(item.isFile()){if(info.size>512*1024)throw new Error('Developer file exceeds 512 KB');bytes+=info.size;if(bytes>25*1024*1024)throw new Error('Developer copy exceeds 25 MB');files.push(relative(root,path).split(sep).join('/'));if(files.length>limit)throw new Error('Too many developer files');}
@@ -22,17 +23,33 @@ async function copyEntry(source,target,path) {
   const real=await realpath(from),root=await realpath(source);
   if(info.isSymbolicLink()||!(real===root||real.startsWith(root+sep)))throw new Error('Source escaped its directory');
   if(info.isDirectory()){for(const child of await filesUnder(from))await copyEntry(source,target,path+'/'+child);}
-  else{if(info.size>512*1024)throw new Error('Source file exceeds 512 KB');await mkdir(resolve(target,path,'..'),{recursive:true});await copyFile(from,resolve(target,path));}
+  else{if(info.size>512*1024)throw new Error('Source file exceeds 512 KB');await mkdir(resolve(target,path,'..'),{recursive:true});if(path==='ui/next-env.d.ts')await writeFile(resolve(target,path),canonicalNextTypes(await readFile(from)));else await copyFile(from,resolve(target,path));}
 }
-export async function snapshotProject(source,candidate,baseline) {
+export async function snapshotProject(source,candidate,baseline,{dependencySource=source,operatorSource}={}) {
   await mkdir(candidate,{recursive:true});await mkdir(baseline,{recursive:true});
   for(const entry of [...topFiles,...roots]){
     try{await copyEntry(source,candidate,entry);}catch(e){if(e.code!=='ENOENT')throw e;}
   }
+  try{await copyEntry(operatorSource||source,candidate,'operator');}catch(error){if(error.code!=='ENOENT')throw error;}
+  try{await copyEntry(dependencySource,candidate,'docs/HOST_OPERATOR.md');}catch(error){if(error.code!=='ENOENT')throw error;}
+  try{await copyEntry(dependencySource,candidate,'docs/DEVELOPMENT_TOOLS.md');}catch(error){if(error.code!=='ENOENT')throw error;}
+  // A released game can predate owner-provided development resources. Supply
+  // missing resources without replacing the agent's evolved versions or the
+  // released game's protected code and dependencies.
+  for(const entry of ['scripts/play-game.js']){
+    try{await lstat(resolve(candidate,entry));}catch(error){if(error.code!=='ENOENT')throw error;try{await copyEntry(dependencySource,candidate,entry);}catch(cause){if(cause.code!=='ENOENT')throw cause;}}
+  }
+  try{for(const file of await filesUnder(resolve(dependencySource,'.agents/skills'))){const entry='.agents/skills/'+file;try{await lstat(resolve(candidate,entry));}catch(error){if(error.code!=='ENOENT')throw error;await copyEntry(dependencySource,candidate,entry);}}}catch(error){if(error.code!=='ENOENT')throw error;}
+  const packagePath=resolve(candidate,'package.json');
+  const packageText=await readFile(packagePath,'utf8'),packageData=JSON.parse(packageText);
+  const hostPackage=JSON.parse(await readFile(resolve(dependencySource,'package.json'),'utf8'));
+  if(packageData.scripts?.['ui:build']==='next build ui'&&hostPackage.scripts?.['ui:build']==='next build ui --webpack'){
+    packageData.scripts['ui:build']=hostPackage.scripts['ui:build'];const newline=packageText.includes('\r\n')?'\r\n':'\n';await writeFile(packagePath,JSON.stringify(packageData,null,2).replace(/\n/g,newline)+newline);
+  }
   const files=[...(await filesUnder(candidate)),...(await lstat(resolve(candidate,'.gitignore')).then(()=>['.gitignore']).catch(()=>[]))];let bytes=0;
   const manifest=[];for(const path of files){const data=await readFile(resolve(candidate,path));bytes+=data.length;if(bytes>25*1024*1024)throw new Error('Source copy exceeds 25 MB');await mkdir(resolve(baseline,path,'..'),{recursive:true});await writeFile(resolve(baseline,path),data);manifest.push({path,sha256:hash(data),bytes:data.length});}
   // Use only the already installed dependency. No install scripts or network downloads.
-  await copyEntry(source,candidate,'node_modules/ws');
+  await copyEntry(dependencySource,candidate,'node_modules/ws');
   await mkdir(resolve(candidate,'.scratch'),{recursive:true});
   return {files:manifest,sourceHash:hash(Buffer.from(JSON.stringify(manifest)))};
 }
@@ -54,8 +71,17 @@ export async function checkSandbox({home,candidate,protectedPaths,binary=codexBi
   const {createServer}=await import('node:net');const listener=createServer(socket=>socket.end());
   await new Promise((accept,reject)=>{listener.once('error',reject);listener.listen(29877,'127.0.0.1',accept);});
   try{
-    const result=await runner(binary,['sandbox','-C',candidate,'-P','living-world','--',process.execPath,'-e',script],{cwd:candidate,env:codexEnvironment(home,resolve(candidate,'.scratch')),timeoutMs:20000});
+    // A directly launched executable can pass while model shell descendants
+    // cannot traverse its installation directory. Exercise the actual tool path.
+    await mkdir(resolve(candidate,'.scratch'),{recursive:true});
+    await writeFile(resolve(candidate,'.scratch/lw-isolation-canary.cjs'),script);
+    let command=process.platform==='win32'?['cmd.exe','/d','/c','node .scratch\\lw-isolation-canary.cjs']:[process.execPath,'-e',script];
+    if(process.platform==='win32'){
+      const shell=resolve(dirname(process.execPath),'../../native/powershell/pwsh.exe');
+      try{await access(shell);command=[shell,'-NoLogo','-NoProfile','-Command','node .scratch/lw-isolation-canary.cjs'];}catch{/* Use the standard system cmd shell. */}
+    }
+    const result=await runner(binary,['sandbox','-C',candidate,'-P','living-world','--',...command],{cwd:candidate,env:codexEnvironment(home,resolve(candidate,'.scratch')),timeoutMs:20000});
     if(result.code!==0||result.timedOut||result.cancelled||result.overflow||!result.stdout.includes('LW_ISOLATION_OK'))throw new Error('Isolation check failed. Developer execution stays blocked.');
     return {ok:true,checkedAt:Date.now(),platform:process.platform,filesystem:'restricted',network:'blocked'};
-  }finally{await new Promise(accept=>listener.close(accept));await unlink(resolve(candidate,'lw-canary.txt')).catch(()=>{});}
+  }finally{await new Promise(accept=>listener.close(accept));await unlink(resolve(candidate,'lw-canary.txt')).catch(()=>{});await unlink(resolve(candidate,'.scratch/lw-isolation-canary.cjs')).catch(()=>{});}
 }

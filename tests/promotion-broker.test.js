@@ -9,6 +9,7 @@ const worldLab={checks:{passed:true},journey:{preserved:true}};
 test('promotion stays closed without a separately verified runtime',()=>{
   const runtime=inspectStagingRuntime({platform:'win32',windowsSandbox:false,containerRuntime:false});
   assert.equal(runtime.ready,false);
+  assert.match(runtime.reason,/not been probed/);
   assert.equal(evaluatePromotion({runtime,manifest,checks,worldLab,constitutionHash:'constitution'}).state,'blocked');
 });
 

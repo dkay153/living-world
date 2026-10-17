@@ -1,9 +1,24 @@
 import { spawn } from 'node:child_process';
-import { mkdir,writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { mkdir,writeFile,access } from 'node:fs/promises';
+import { resolve,dirname,delimiter } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
+import { readdirSync,statSync } from 'node:fs';
 
-export const codexBinary=()=>process.env.LIVING_WORLD_CODEX_BIN||(process.platform==='win32'?'codex.exe':'codex');
+export function codexBinary({env=process.env,platform=process.platform}={}) {
+  if(env.LIVING_WORLD_CODEX_BIN)return env.LIVING_WORLD_CODEX_BIN;
+  // Explorer keeps an older PATH after desktop installation or updates.
+  // Resolve only the installed app's executable, never project candidate files.
+  if(platform==='win32'&&env.LOCALAPPDATA){
+    const root=resolve(env.LOCALAPPDATA,'OpenAI/Codex/bin');
+    try{
+      const installed=readdirSync(root,{withFileTypes:true}).filter(entry=>entry.isDirectory()).flatMap(entry=>{
+        const file=resolve(root,entry.name,'codex.exe');try{const stat=statSync(file);return stat.isFile()?[{file,time:stat.mtimeMs}]:[];}catch{return [];}
+      }).sort((a,b)=>b.time-a.time);
+      if(installed.length)return installed[0].file;
+    }catch{/* Standalone installations continue to use PATH. */}
+  }
+  return platform==='win32'?'codex.exe':'codex';
+}
 export function classifyCodexError(value){
   const text=String(value).toLowerCase();
   if(/unexpected argument|invalid value|no prompt|requires.*argument|cannot.*image|failed to.*image/.test(text))return 'cli_input';
@@ -17,10 +32,10 @@ export function classifyCodexError(value){
 }
 export function codexEnvironment(home,temp=resolve(home,'tmp')) {
   // Never forward provider credentials, Node injection, or the owner's Codex settings.
-  const names=['PATH','Path','SystemRoot','WINDIR','COMSPEC','PATHEXT','USERPROFILE','APPDATA','LOCALAPPDATA','PROGRAMFILES','ProgramFiles','ProgramFiles(x86)','SystemDrive','LANG'];
+  const names=['SystemRoot','WINDIR','COMSPEC','PATHEXT','USERPROFILE','APPDATA','LOCALAPPDATA','PROGRAMFILES','ProgramFiles','ProgramFiles(x86)','SystemDrive','LANG'];
   const env=Object.fromEntries(names.filter(k=>process.env[k]!==undefined).map(k=>[k,process.env[k]]));
   // Avoid Node's metadata traversal through denied parent directories in MXC.
-  return {...env,CODEX_HOME:home,TEMP:temp,TMP:temp,NODE_OPTIONS:'--preserve-symlinks --preserve-symlinks-main'};
+  return {...env,PATH:dirname(process.execPath)+delimiter+(process.env.PATH||process.env.Path||''),CODEX_HOME:home,TEMP:temp,TMP:temp,NODE_OPTIONS:'--preserve-symlinks --preserve-symlinks-main'};
 }
 export function stopProcess(child) {
   if(!child?.pid||child.exitCode!==null)return Promise.resolve();
@@ -34,30 +49,50 @@ export function stopProcess(child) {
 }
 export async function prepareCodexHome(home) {
   await mkdir(resolve(home,'tmp'),{recursive:true});
+  // The bundled shell needs its own DLL/runtime directory, just as Node does.
+  // Resolve only the known sibling runtime, never arbitrary PATH/home entries.
+  const shellDirectory=resolve(dirname(process.execPath),'../../native/powershell');
+  let shellPermission='';
+  if(process.platform==='win32')try{await access(resolve(shellDirectory,'pwsh.exe'));shellPermission=JSON.stringify(shellDirectory)+' = "read"\n';}catch{/* No bundled PowerShell installation. */}
+  let skillPermissions='';
+  // Owner-authorized skill/plugin resources only, never the surrounding
+  // account home, auth files, settings or unrelated personal directories.
+  if(process.platform==='win32'&&process.env.USERPROFILE)for(const folder of ['.codex/skills','.codex/plugins/cache']){
+    const path=resolve(process.env.USERPROFILE,folder);try{await access(path);skillPermissions+=JSON.stringify(path)+' = "read"\n';}catch{/* Optional resource directory. */}
+  }
   // This is the project's own home. Never modify the desktop app's account/configuration.
-  const config=`project_root_markers = ["AGENTS.md"]\nforced_login_method = "chatgpt"\nmodel_provider = "openai"\napproval_policy = "never"\ndefault_permissions = "living-world"\ncli_auth_credentials_store = "file"\n[windows]\nsandbox = "mxc"\n[permissions.living-world]\nextends = ":workspace"\n[permissions.living-world.filesystem]\n":root" = "deny"\n":minimal" = "read"\n${JSON.stringify(process.execPath)} = "read"\n[permissions.living-world.filesystem.":workspace_roots"]\n"." = "write"\n[permissions.living-world.network]\nenabled = false\n`;
+  const config=`project_root_markers = ["AGENTS.md"]\nforced_login_method = "chatgpt"\nmodel_provider = "openai"\napproval_policy = "never"\ndefault_permissions = "living-world"\ncli_auth_credentials_store = "file"\n[windows]\nsandbox = "mxc"\n[permissions.living-world]\nextends = ":workspace"\n[permissions.living-world.filesystem]\n":root" = "deny"\n":minimal" = "read"\n${JSON.stringify(dirname(process.execPath))} = "read"\n${shellPermission}${skillPermissions}[permissions.living-world.filesystem.":workspace_roots"]\n"." = "write"\n[permissions.living-world.network]\nenabled = false\n`;
   await writeFile(resolve(home,'config.toml'),config,{mode:0o600});
 }
 
-export function runProcess(binary,args,{cwd,env,timeoutMs=30000,signal,maxBytes=2*1024*1024,onLine,input='',spawnProcess=spawn}={}) {
+export function runProcess(binary,args,{cwd,env,timeoutMs=30000,signal,maxBytes=2*1024*1024,onLine,input='',spawnProcess=spawn,stopChild=stopProcess,completionGraceMs=2000,dockerDiagnostics=false}={}) {
+  if(dockerDiagnostics&&!/^docker(?:\.exe)?$/i.test(binary.split(/[\\/]/).at(-1)))throw Error('Only Docker diagnostics may be merged; account CLI logs remain private');
   return new Promise((resolveRun,reject)=>{
     if(signal?.aborted){reject(new Error('Operation cancelled'));return;}
     const child=spawnProcess(binary,args,{cwd,env,windowsHide:true,shell:false,stdio:['pipe','pipe','pipe']});
-    let stdout='',line='',bytes=0,timedOut=false,cancelled=false,overflow=false,diagnostic=null;const decoder=new StringDecoder('utf8');
-    const emit=value=>{try{onLine?.(value);}catch{overflow=true;void stopProcess(child);}};
-    const stop=()=>{cancelled=true;void stopProcess(child);};signal?.addEventListener('abort',stop,{once:true});
-    const timer=setTimeout(()=>{timedOut=true;void stopProcess(child);},timeoutMs);timer.unref?.();
-    const cleanup=()=>{clearTimeout(timer);signal?.removeEventListener('abort',stop);};
-    child.stdout.on('data',chunk=>{bytes+=chunk.length;if(bytes>maxBytes){overflow=true;void stopProcess(child);return;}const decoded=decoder.write(chunk);stdout+=decoded;if(onLine){line+=decoded;let i;while((i=line.indexOf('\n'))>=0){emit(line.slice(0,i));line=line.slice(i+1);}}});
+    let stdout='',line='',bytes=0,timedOut=false,cancelled=false,overflow=false,diagnostic=null,terminalCompleted=false,cleanupForced=false,completionTimer=null;const decoder=new StringDecoder('utf8');
+    const jsonExecution=/^codex(?:\.exe|\.cmd)?$/i.test(binary.split(/[\\/]/).at(-1))&&args[0]==='exec'&&args.includes('--json');
+    const stopOwned=()=>{void stopChild(child).catch(()=>{});};
+    const emit=value=>{
+      try{onLine?.(value);}catch{overflow=true;stopOwned();}
+      if(!jsonExecution)return;
+      let event;try{event=JSON.parse(value);}catch{return;}
+      if(event.type==='turn.failed'||event.type==='error'){terminalCompleted=false;clearTimeout(completionTimer);}
+      if(event.type==='turn.completed'&&!completionTimer){terminalCompleted=true;completionTimer=setTimeout(()=>{if(child.exitCode===null&&!cancelled&&!timedOut&&!overflow){cleanupForced=true;stopOwned();}},completionGraceMs);}
+    };
+    const stop=()=>{cancelled=true;stopOwned();};signal?.addEventListener('abort',stop,{once:true});
+    const timer=timeoutMs===null?null:setTimeout(()=>{timedOut=true;stopOwned();},timeoutMs);timer?.unref?.();
+    const cleanup=()=>{clearTimeout(timer);clearTimeout(completionTimer);signal?.removeEventListener('abort',stop);};
+    child.stdout.on('data',chunk=>{bytes+=chunk.length;if(bytes>maxBytes){overflow=true;stopOwned();return;}const decoded=decoder.write(chunk);stdout+=decoded;if(onLine||jsonExecution){line+=decoded;let i;while((i=line.indexOf('\n'))>=0){emit(line.slice(0,i));line=line.slice(i+1);}}});
     // Raw CLI logs may contain account material. Do not expose or persist them.
-    child.stderr.on('data',chunk=>{diagnostic=classifyCodexError(chunk.toString('utf8'))||diagnostic;});
+    child.stderr.on('data',chunk=>{if(dockerDiagnostics){bytes+=chunk.length;if(bytes>maxBytes){overflow=true;stopOwned();return;}stdout+=chunk.toString('utf8');}else diagnostic=classifyCodexError(chunk.toString('utf8'))||diagnostic;});
     child.once('error',()=>{cleanup();reject(new Error('Codex executable unavailable'));});
-    child.once('close',code=>{cleanup();const end=decoder.end();stdout+=end;line+=end;if(line&&onLine)emit(line);resolveRun({code,stdout,timedOut,cancelled,overflow,diagnostic});});
+    child.once('close',nativeExitCode=>{const end=decoder.end();stdout+=end;line+=end;if(line&&(onLine||jsonExecution))emit(line);cleanup();const completedCleanup=terminalCompleted&&cleanupForced&&!cancelled&&!timedOut&&!overflow;resolveRun({code:completedCleanup?0:nativeExitCode,stdout,timedOut,cancelled,overflow,diagnostic,...(jsonExecution?{completion:{terminalCompleted,cleanupForced,nativeExitCode}}:{})});});
     child.stdin.on('error',()=>{});child.stdin.end(input);
   });
 }
 
-export function createRpc({home,cwd,binary=codexBinary(),spawnProcess=spawn,onNotification=()=>{}}) {
+export function createRpc({home,cwd,binary=codexBinary(),spawnProcess=spawn,onNotification=()=>{},onClose=()=>{},environment}) {
   let child=null,ready=null,sequence=0,buffer='',pending=new Map(),generation=0;
   function rejectAll(){for(const p of pending.values()){clearTimeout(p.timer);p.reject(new Error('Codex connection closed'));}pending.clear();}
   function send(value){if(!child?.stdin.writable)throw new Error('Codex connection unavailable');child.stdin.write(JSON.stringify(value)+'\n');}
@@ -67,25 +102,26 @@ export function createRpc({home,cwd,binary=codexBinary(),spawnProcess=spawn,onNo
     const current=++generation;
     ready=(async()=>{
       await prepareCodexHome(home);buffer='';
-      child=spawnProcess(binary,['app-server','--strict-config','--listen','stdio://'],{cwd,env:codexEnvironment(home),windowsHide:true,shell:false,stdio:['pipe','pipe','pipe']});
+      child=spawnProcess(binary,['app-server','--strict-config','--listen','stdio://'],{cwd,env:environment||codexEnvironment(home),windowsHide:true,shell:false,stdio:['pipe','pipe','pipe']});
       const processChild=child;
       const decoder=new StringDecoder('utf8');child.stdin.on('error',()=>rejectAll());
       child.stderr.on('data',()=>{});
       child.stdout.on('data',chunk=>{
         if(current!==generation)return;buffer+=decoder.write(chunk);if(buffer.length>2*1024*1024){void close();return;}
         let i;while((i=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,i);buffer=buffer.slice(i+1);let value;try{value=JSON.parse(line);}catch{continue;}
-          if(value.id!==undefined&&pending.has(value.id)){const p=pending.get(value.id);pending.delete(value.id);clearTimeout(p.timer);if(value.error)p.reject(new Error('Codex rejected '+methodLabel(value.error.code)));else p.accept(value.result);}
-          else if(value.id!==undefined&&value.method){send({id:value.id,error:{code:-32601,message:'Host method unavailable'}});}
+          if(value.id!==undefined&&value.method){send({id:value.id,error:{code:-32601,message:'Host method unavailable'}});}
+          else if(value.id!==undefined&&pending.has(value.id)){const p=pending.get(value.id);pending.delete(value.id);clearTimeout(p.timer);if(value.error)p.reject(new Error('Codex rejected '+methodLabel(value.error.code)));else p.accept(value.result);}
           else if(value.method)onNotification(value.method,value.params||{});
         }
       });
-      const closed=()=>{if(processChild===child){rejectAll();child=null;ready=null;}};
+      const closed=()=>{if(processChild===child){rejectAll();child=null;ready=null;onClose();}};
       child.once('error',closed);child.once('close',closed);
       await raw('initialize',{clientInfo:{name:'living_world_observatory',title:'Living World Observatory',version:'0.4.0'},capabilities:{experimentalApi:false}});send({method:'initialized',params:{}});
     })().catch(async e=>{if(current===generation)await close();throw e;});return ready;
   }
   const methodLabel=code=>`request (${Number.isInteger(code)?code:'unknown'})`;
   async function request(method,params={}){await start();return raw(method,params);}
-  async function close(){generation++;const old=child;child=null;ready=null;rejectAll();await stopProcess(old);}
+  async function close(){generation++;const old=child;child=null;ready=null;rejectAll();if(old)onClose();await stopProcess(old);}
   return {request,close};
 }
+

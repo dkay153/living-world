@@ -18,11 +18,11 @@ async function body(req){
   let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>16000)throw fail('Request too large',413);}
   try{const value=JSON.parse(raw);if(!value||typeof value!=='object'||Array.isArray(value))throw new Error();return value;}catch{throw fail('Invalid JSON');}
 }
-export function createAdmin({store,steward,dataDir,backupDir=resolve('backups'),publicOrigin=process.env.PUBLIC_ORIGIN||'http://127.0.0.1:3000',online=()=>0,clock=Date.now,fetcher=fetch,developer}){
+export function createAdmin({store,steward,dataDir,backupDir=resolve('backups'),publicOrigin=process.env.PUBLIC_ORIGIN||'http://127.0.0.1:3000',online=()=>0,clock=Date.now,fetcher=fetch,developer,quiesceLegacy}){
   const db=store.db,auth=createOwnerAuth(db,clock),control=settings(db),secrets=createSecretStore(db,dataDir),started=clock();
-  const dev=developer||createDeveloper({store,dataDir,clock});
+  const dev=developer||createDeveloper({store,dataDir,clock,quiesceLegacy});
   const studio=createStudioChat({store,developer:dev,clock});
-  const lab=createWorldLab({dataDir,projectDir:resolve('.'),embedOrigin:publicOrigin,clock,visuals:dev.visuals});
+  const lab=createWorldLab({dataDir,projectDir:resolve('.'),embedOrigin:publicOrigin+(process.env.LW_SITE_PREVIEW==='1'?' http://127.0.0.1:3105':''),clock,visuals:dev.visuals});
   const audit=(action,details={})=>db.prepare('INSERT INTO admin_audit(action,details) VALUES (?,?)').run(action,JSON.stringify(details));
   const root=new URL('../public/',import.meta.url),uiRoot=new URL('../ui/out/',import.meta.url),rate=new Map();let modelCheckRunning=false;
   const files={'/admin':['admin.html','text/html',uiRoot],'/admin/':['admin.html','text/html',uiRoot],'/admin-classic':['admin.html','text/html',root],'/admin-classic/':['admin.html','text/html',root],'/admin.js':['admin.js','text/javascript',root],'/admin.css':['admin.css','text/css',root]};
@@ -76,7 +76,7 @@ export function createAdmin({store,steward,dataDir,backupDir=resolve('backups'),
       if(path==='/api/admin/developer/report'&&req.method==='GET'){send(res,200,await dev.report(url.searchParams.get('id')));return true;}
       if(path.startsWith('/api/admin/developer/')&&req.method==='POST'){
         const input=await body(req),action=path.slice('/api/admin/developer/'.length);
-        const actions={refresh:()=>dev.refresh(),poll:()=>dev.refresh(false),login:()=>dev.signIn(input.type),cancelLogin:()=>dev.cancelLogin(),disconnect:()=>dev.disconnect(),isolation:()=>dev.verifyIsolation(),settings:()=>dev.saveConfig(input),tasks:()=>dev.enqueue(input),cancel:()=>dev.cancel(input.id),autonomy:()=>dev.saveAutonomy(input),wake:()=>dev.wake(),rollback:()=>dev.rollbackVisuals()};
+        const actions={preview:()=>dev.previewRun(input),refresh:()=>dev.refresh(),poll:()=>dev.refresh(false),login:()=>dev.signIn(input.type),cancelLogin:()=>dev.cancelLogin(),disconnect:()=>dev.disconnect(),isolation:()=>dev.verifyIsolation(),settings:()=>dev.saveConfig(input),tasks:()=>dev.enqueue(input),cancel:()=>dev.cancel(input.id),stop:()=>dev.stopRun(input.id),resume:()=>dev.resumeRun(input),autonomy:()=>dev.saveAutonomy(input),wake:()=>dev.wake(),rollback:()=>dev.rollbackVisuals(),sourceRefresh:()=>dev.sourceRefresh(),sourceBootstrap:()=>dev.sourceBootstrap(),sourceRollback:()=>dev.sourceRollback(),operatorRollback:()=>dev.operatorRollback()};
         if(!actions[action])throw fail('Unknown developer action');
         try{send(res,200,await actions[action]());}catch(e){if(e.status)throw e;throw fail('Codex operation failed. Reconnect or check the installed CLI.',502);}return true;
       }
@@ -154,3 +154,4 @@ export function createAdmin({store,steward,dataDir,backupDir=resolve('backups'),
   async function close(){await lab.close();await dev.close();}
   return {handle,developer:dev,studio,lab,close};
 }
+

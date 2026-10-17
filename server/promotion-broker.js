@@ -6,7 +6,7 @@ export function inspectStagingRuntime({platform=process.platform,windowsSandbox=
   if(platform!=='win32')return {ready:false,kind:'unverified',reason:'A separately verified candidate runtime is required before source promotion'};
   if(windowsSandbox)return {ready:true,kind:'windows_sandbox',reason:'Disposable Windows Sandbox runtime verified'};
   if(containerRuntime)return {ready:true,kind:'container',reason:'Disposable container runtime verified'};
-  return {ready:false,kind:'none',reason:'Windows Sandbox, Hyper-V, Docker and Podman are unavailable on this host'};
+  return {ready:false,kind:'none',reason:'No separately verified candidate staging runtime is configured; runtime installation has not been probed'};
 }
 
 // This broker never copies source into production. It only decides whether an

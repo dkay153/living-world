@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+@source ".";
+@source "../components";
 
 @theme inline {
   --color-background: var(--background);
@@ -74,21 +76,46 @@ button { cursor: pointer; }
   .world-mode { display: none; }
   .chronicle { right: 10px; top: 52px; }
 }
-.studio-chat-scroll [data-stick-to-bottom-scroll] { scrollbar-width: thin; scrollbar-color: color-mix(in oklch, var(--primary) 42%, transparent) transparent; }
-.studio-chat-scroll [data-stick-to-bottom-scroll]::-webkit-scrollbar { width: 8px; }
-.studio-chat-scroll [data-stick-to-bottom-scroll]::-webkit-scrollbar-track { background: transparent; }
-.studio-chat-scroll [data-stick-to-bottom-scroll]::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: color-mix(in oklch, var(--primary) 48%, transparent); background-clip: padding-box; }
-.studio-chat-scroll [data-stick-to-bottom-scroll]::-webkit-scrollbar-thumb:hover { background: color-mix(in oklch, var(--primary) 72%, transparent); background-clip: padding-box; }
 
-.studio-chat-scroll, .studio-chat-scroll > * { overflow-x: hidden !important; }
-.studio-chat-scroll > * { scrollbar-width: thin; scrollbar-color: color-mix(in oklch, var(--primary) 42%, transparent) transparent; }
-.studio-chat-scroll > *::-webkit-scrollbar { width: 8px; height: 0; }
-.studio-chat-scroll > *::-webkit-scrollbar-track { background: transparent; }
-.studio-chat-scroll > *::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: color-mix(in oklch, var(--primary) 48%, transparent); background-clip: padding-box; }
+/* Official AI Elements dark example tokens, measured from elements.ai-sdk.dev.
+   Scope them to the admin body so portalled menus share the same source theme. */
+body:has(.admin-studio) {
+  --background: lab(2.75381% 0 0);
+  --foreground: lab(98.26% 0 0);
+  --card: lab(7.78201% -.0000149012 0);
+  --card-foreground: lab(98.26% 0 0);
+  --popover: lab(7.78201% -.0000149012 0);
+  --popover-foreground: lab(98.26% 0 0);
+  --primary: lab(47.9229% 22.3147 -86.8328);
+  --primary-foreground: lab(100% 0 0);
+  --secondary: lab(15.204% 0 -.00000596046);
+  --secondary-foreground: lab(98.26% 0 0);
+  --muted: lab(15.204% 0 -.00000596046);
+  --muted-foreground: lab(66.128% -.0000298023 .0000119209);
+  --accent: lab(15.204% 0 -.00000596046);
+  --accent-foreground: lab(98.26% 0 0);
+  --destructive: lab(63.7053% 60.745 31.3109);
+  --border: lab(100% 0 0 / .1);
+  --input: lab(100% 0 0 / .15);
+  --ring: lab(48.496% 0 0);
+  --radius: .625rem;
+  font-family: var(--font-geist), Arial, Helvetica, sans-serif;
+  color-scheme: dark;
+}
 
-/* Keep every Studio overflow surface native-dark and unobtrusive. */
-* { scrollbar-width: thin; scrollbar-color: color-mix(in oklch, var(--primary) 38%, var(--background)) var(--background); }
-*::-webkit-scrollbar { width: 8px; height: 8px; }
-*::-webkit-scrollbar-track { background: var(--background); }
-*::-webkit-scrollbar-thumb { border: 2px solid var(--background); border-radius: 999px; background: color-mix(in oklch, var(--primary) 52%, var(--background)); }
-*::-webkit-scrollbar-corner { background: var(--background); }
+/* The official shadcn/AI Elements base layer supplies these token defaults. */
+@layer base {
+  body:has(.admin-studio) * { @apply border-border outline-ring/50; }
+}
+
+/* Radix ScrollArea's own viewport rules, supplied externally because the
+   service intentionally blocks injected inline <style> elements. */
+.admin-studio [data-radix-scroll-area-viewport] { scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch; }
+.admin-studio [data-radix-scroll-area-viewport]::-webkit-scrollbar { display: none; }
+
+.studio-document { font-size: .875rem; line-height: 1.8; }
+.studio-document h1 { font-size: 1.75rem; line-height: 1.25; letter-spacing: -.025em; margin-bottom: 1.5rem; }
+.studio-document h2 { font-size: 1.25rem; line-height: 1.4; margin-top: 2rem; margin-bottom: 1rem; }
+.studio-document h3 { font-size: 1rem; margin-top: 1.5rem; margin-bottom: .75rem; }
+.studio-document p, .studio-document ul, .studio-document ol { margin-bottom: 1rem; }
+.studio-document code { overflow-wrap: anywhere; }

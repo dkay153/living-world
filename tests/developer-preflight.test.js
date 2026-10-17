@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {readFile,mkdtemp,writeFile,rm} from 'node:fs/promises';import {join} from 'node:path';import {tmpdir} from 'node:os';
+import {validatePng,validateEvidenceImages} from '../server/developer-preflight.js';import {artPreview} from '../server/art-preview.js';
+const png=artPreview(JSON.parse(await readFile(new URL('../public/art.json',import.meta.url),'utf8')));
+test('actual host art evidence validates without a CLI, model or network call',()=>{assert.deepEqual(validatePng(png),{width:384,height:256,bytes:png.length});});
+test('corrupt, truncated, oversized and non-PNG evidence is rejected',()=>{const corrupt=Buffer.from(png);corrupt[40]^=1;for(const bytes of [corrupt,png.subarray(0,30),Buffer.alloc(4*1024*1024+1),Buffer.from('not an image')])assert.throws(()=>validatePng(bytes));});
+test('evidence file validation is bounded and rejects directories',async()=>{const dir=await mkdtemp(join(tmpdir(),'lw-evidence-'));try{const path=join(dir,'art.png');await writeFile(path,png);assert.equal((await validateEvidenceImages([path]))[0].width,384);await assert.rejects(()=>validateEvidenceImages([dir]));await assert.rejects(()=>validateEvidenceImages([]));}finally{await rm(dir,{recursive:true,force:true});}});

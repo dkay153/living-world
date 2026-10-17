@@ -30,3 +30,16 @@ test('dossier contains aggregate observations without guest bearer IDs or secret
     assert.doesNotThrow(()=>a.save({enabled:true,intervalMinutes:1,automaticVisuals:true}));
   }finally{db.close();}
 });
+
+test('independent selection sees full studio capabilities and honest evidence coverage',()=>{
+  const {db,a,run}=fixture();try{
+    for(let i=0;i<10;i++)a.learn(run(),'candidate_validated','Retained source proposal',{hypothesisVerified:false});
+    const dossier=a.evidence();assert.deepEqual(dossier.coverage.outcomes,{returned:8,total:10,truncated:true});
+    assert.ok(dossier.development.source.roots.includes('ui'));
+    assert.equal(dossier.development.source.uiBuildAvailable,false);
+    assert.equal(dossier.development.capabilities.find(item=>item.id==='general_source_release').state,'implemented_gated');
+    assert.match(dossier.development.capabilities.find(item=>item.id==='world_lab').limits,/does not verify a changed candidate/);
+    assert.match(dossier.development.boundary,/does not enable/);
+    assert.equal(a.config().enabled,false);
+  }finally{db.close();}
+});

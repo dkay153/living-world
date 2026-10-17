@@ -10,13 +10,20 @@ import { createSteward } from './steward.js';
 import { personalJournal } from './memory.js';
 import { createAdmin } from './admin.js';
 import { SCHEMA_VERSION } from './migrations.js';
+import { createPreviewEntry } from './preview-entry.js';
+import { settings } from './owner-settings.js';
 const host=process.env.HOST || '127.0.0.1', port=Number(process.env.PORT || 3000), publicOrigin=process.env.PUBLIC_ORIGIN||`http://${host}:${port}`;
 const dataDir=resolve(process.env.DATA_DIR || 'data');
 const store=openStore(resolve(dataDir,'world.sqlite'));
 const game=createGame(store);
 const steward=createSteward(store);
 const sessions=new Map(), peers=new Map();
-const admin=createAdmin({store,steward,dataDir,backupDir:resolve(process.env.BACKUP_DIR||'backups'),publicOrigin,online:()=>peers.size});
+const delegated=()=>settings(store.db).get('sourceLaneOwnsWorld',false);
+const admin=createAdmin({store,steward,dataDir,backupDir:resolve(process.env.BACKUP_DIR||'backups'),publicOrigin,online:()=>peers.size,quiesceLegacy:async()=>{
+  settings(store.db).set('sourceLaneOwnsWorld',true);
+  for(const ws of peers.keys())ws.close(1012,'The protected game runtime now owns this world');
+}});
+const previewEntry=createPreviewEntry({db:store.db,origin:publicOrigin,enabled:process.env.LW_SITE_PREVIEW==='1'});
 const publicRoot=new URL('../public/',import.meta.url),uiRoot=new URL('../ui/out/',import.meta.url);
 const publicFiles={'/':['index.html','text/html',uiRoot], '/legacy/':['index.html','text/html',publicRoot], '/style.css':['style.css','text/css',publicRoot], '/seed.js':['seed.js','text/javascript',publicRoot]};
 const contentType=path=>path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':path.endsWith('.json')?'application/json':path.endsWith('.svg')?'image/svg+xml':path.endsWith('.png')?'image/png':path.endsWith('.woff2')?'font/woff2':'application/octet-stream';
@@ -29,7 +36,9 @@ const server=http.createServer(async(req,res)=>{
   res.setHeader('Content-Security-Policy',`default-src 'self'; connect-src 'self'; style-src 'self'; script-src 'self' 'unsafe-inline'; frame-ancestors ${frameAncestors}${studioFrame}`);
   res.setHeader('Cache-Control','no-store');
   res.setHeader('Referrer-Policy','no-referrer');
+  if(previewEntry(req,res))return;
   if(await admin.handle(req,res))return;
+  if(delegated()&&(path==='/'||path==='/legacy/')){const lane=admin.developer.sourceStatus();if(lane.ready&&lane.gameUrl){res.writeHead(302,{Location:lane.gameUrl+'/'});return res.end();}res.writeHead(503);return res.end('The protected game runtime is recovering. Player progress is retained.');}
   if(path==='/art.json'&&req.method==='GET') {
     let art=admin.developer.visuals.read();
     if(process.env.LW_ART_FILE){try{art=JSON.parse(await readFile(process.env.LW_ART_FILE,'utf8'));}catch{/* Keep the last valid in-memory baseline if the Lab artifact is unavailable. */}}
@@ -48,6 +57,7 @@ const server=http.createServer(async(req,res)=>{
 });
 const wss=new WebSocketServer({noServer:true,maxPayload:1024});
 server.on('upgrade',(req,socket,head)=>{
+  if(delegated())return socket.destroy();
   const expected=process.env.PUBLIC_ORIGIN || `http://${req.headers.host}`;
   if(req.url!=='/world' || req.headers.origin!==expected) return socket.destroy();
   const cookie=req.headers.cookie?.match(/(?:^|;\s*)lw_session=([a-f0-9]{64})(?:;|$)/)?.[1];
@@ -58,7 +68,7 @@ server.on('upgrade',(req,socket,head)=>{
 // The opaque cookie is the local guest identity; public account authentication is a later gate.
 wss.on('headers',(headers,req)=>{ if(req.isNew) headers.push(`Set-Cookie: lw_session=${req.playerId}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000${process.env.COOKIE_SECURE==='1'?'; Secure':''}`); });
 function send(ws,value){if(ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify(value));}
-function broadcast(){const players=[...peers.values()].map(p=>({id:p.id.slice(0,8),x:p.x,y:p.y}));const creatures=game.snapshot(); for(const [ws,p] of peers)send(ws,{type:'state',players,creatures,history:store.history(),journey:store.loadGame(p.id),discoveries:store.discoveries(p.id),journal:personalJournal(store,p.id)});}
+function broadcast(){if(delegated())return;const players=[...peers.values()].map(p=>({id:p.id.slice(0,8),x:p.x,y:p.y}));const creatures=game.snapshot(); for(const [ws,p] of peers)send(ws,{type:'state',players,creatures,history:store.history(),journey:store.loadGame(p.id),discoveries:store.discoveries(p.id),journal:personalJournal(store,p.id)});}
 wss.on('connection',(ws,req)=>{
   const id=req.playerId;
   if(sessions.has(id)) sessions.get(id).close(4000,'Opened in another tab');
@@ -66,6 +76,7 @@ wss.on('connection',(ws,req)=>{
   send(ws,{type:'welcome',id:id.slice(0,8),width:WIDTH,height:HEIGHT,tiles:Array.from({length:HEIGHT},(_,y)=>Array.from({length:WIDTH},(_,x)=>tile(x,y))),objects,discoveries:store.discoveries(id)});
   broadcast(); let last=0;
   ws.on('message',raw=>{
+    if(delegated())return;
     if(sessions.get(id)!==ws)return;
     const now=Date.now(); if(now-last<140)return; last=now;
     try {
@@ -81,7 +92,7 @@ wss.on('connection',(ws,req)=>{
   ws.on('close',()=>{peers.delete(ws);if(sessions.get(id)===ws)sessions.delete(id);broadcast();});
 });
 server.listen(port,host,()=>console.log(`Living World running at http://${host}:${server.address().port}`));
-const heartbeat=setInterval(()=>{if(peers.size)broadcast();},2000);
+const heartbeat=setInterval(()=>{if(peers.size&&!delegated())broadcast();},2000);
 function runMemory(){try{steward.tick();}catch(e){console.error('memory_worker_failed',e.message);}}
 runMemory();const memoryWorker=setInterval(runMemory,2000);
 function runDeveloper(){admin.developer.tick().catch(()=>console.error('developer_worker_failed'));}

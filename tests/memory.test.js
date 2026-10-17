@@ -8,6 +8,7 @@ import { openStore } from '../server/store.js';
 import { createGame } from '../server/game.js';
 import { createSteward } from '../server/steward.js';
 import { describePlayer,personalJournal } from '../server/memory.js';
+import { settings } from '../server/owner-settings.js';
 const fixture=JSON.parse(readFileSync(new URL('./fixtures/first-echo.json',import.meta.url)));
 function harness(fn){const dir=mkdtempSync(join(tmpdir(),'lw-memory-'));const store=openStore(join(dir,'world.sqlite'));try{fn(store,dir);}finally{store.db.close();rmSync(dir,{recursive:true,force:true});}}
 test('recorded quest fixture establishes item provenance and bounded NPC knowledge',()=>harness(store=>{
@@ -24,6 +25,18 @@ test('recorded quest fixture establishes item provenance and bounded NPC knowled
   const steward=createSteward(store,()=>1000);steward.tick();assert.equal(steward.status().jobs.queued||0,0);assert.ok(store.db.prepare('SELECT summary FROM memories WHERE player=?').get(player.id));
   const jobCount=store.db.prepare('SELECT COUNT(*) AS count FROM jobs').get().count;steward.tick();assert.equal(store.db.prepare('SELECT COUNT(*) AS count FROM jobs').get().count,jobCount);
 }));
+test('delegated world stops legacy memory writes without changing history or owner model settings',()=>harness(store=>{
+  store.player('traveler');store.event('traveler','discovery','well');
+  const control=settings(store.db);control.set('developer',{enabled:false,model:'owner-model',maxMinutes:17});
+  const worker=createSteward(store,()=>1000);worker.tick();
+  store.event('traveler','discovery','stone');control.set('sourceLaneOwnsWorld',true);
+  const snapshot=()=>JSON.stringify(['events','memories','jobs','checkpoints'].map(table=>store.db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()));
+  const before=snapshot();worker.tick();worker.tick();assert.equal(snapshot(),before);
+  assert.deepEqual(control.get('developer'),{enabled:false,model:'owner-model',maxMinutes:17});
+  control.set('sourceLaneOwnsWorld',false);worker.tick();assert.notEqual(snapshot(),before);
+  assert.equal(store.db.prepare('SELECT count(*) AS n FROM events').get().n,2);
+}));
+
 test('failed action rolls back state, provenance, knowledge and history together',()=>harness(store=>{
   const game=createGame(store),p=store.player('a');p.x=21;p.y=9;
   const award=store.awardItem;store.awardItem=()=>{throw new Error('simulated item failure');};

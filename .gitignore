@@ -6,6 +6,8 @@ backups/
 work/
 outputs/
 ui/.next/
+ui/.next-dev/
 ui/out/
 client-godot/.godot/
 ui/tsconfig.tsbuildinfo
+.scratch/

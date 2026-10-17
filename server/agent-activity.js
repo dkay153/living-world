@@ -1,6 +1,22 @@
 const clean=value=>typeof value==='string'?value.trim():'';
 
 const phases={
+  'Answering your question in the isolated copy':{
+    title:'Reading the project to answer you',intent:'Answer your question using the connected agent and saved model settings.',current:'The agent is reading an isolated project copy. This question cannot publish source changes.',next:'Its public updates and answer will appear here.',complete:'An answer is recorded without changing the game.'
+  },
+  'Testing the exact candidate in the contained browser and saved-world runtime':{
+    title:'Checking the change in the contained game',intent:'Verify the exact candidate before it can reach players.',current:'The independent runtime is building the UI, running tests, and checking browser journeys and saved-world compatibility.',next:'Only a passing artifact can proceed to deployment. Failed checks retain the current game.',complete:'Artifact-bound validation and history receipts are saved.'
+  },
+  'Promoting the verified source while preserving the acknowledged world':{
+    title:'Deploying the verified game change',intent:'Ship passing source while preserving current player progress.',current:'The host is backing up and checking the replacement against the latest acknowledged world.',next:'Confirm startup and retain the previous source for rollback.',complete:'A publication receipt confirms which source is running.'
+  },
+  'Stopped after repeated failures':{
+    title:'Independent development is stopped',
+    intent:'Avoid repeating uncertain account attempts.',
+    current:'Three consecutive failed or interrupted attempts opened the scheduling circuit. No autonomous cycle is running.',
+    next:'Inspect retained artifacts and repair the execution failure before explicitly starting a new attempt.',
+    complete:'A new attempt produces a recorded, verified outcome.'
+  },
   'Copying project source':{
     title:'Preparing an isolated working copy',
     intent:'Give the developer a safe, exact baseline before it studies or changes anything.',
@@ -116,13 +132,28 @@ export function narrateActivity(activity={},now=Date.now){
     startedAt,
     updatedAt:Number(activity.updatedAt)||startedAt||timestamp,
     elapsedSeconds:startedAt?Math.max(0,Math.floor((timestamp-startedAt)/1000)):null,
-    detail:clean(activity.detail)
+    detail:clean(activity.detail),
+    model:clean(activity.model),
+    execution:activity.execution||null
   };
 }
 
 export function narrateOutcome({state,error,report={}}={}){
+  if(state==='succeeded'&&report.kind==='conversation')return {title:'Agent reply',body:clean(report.summary),current:'Answered from the isolated project copy. No source changes or release.',refreshSandbox:false};
   const evaluation=clean(report.evaluation?.state),release=clean(report.release?.state),promotion=clean(report.promotion?.state);
   const changed=Array.isArray(report.changedFiles)?report.changedFiles.length:0;
+  if(release==='published'&&report.release?.kind==='host_operator')return {
+    title:'Verified operator and tools are installed',body:'The exact staged operator release is running in confinement. The independent kernel still enforces owner access, budgets and history protection.',intent:'Replace operational policy and tools through verified deployment.',current:'The installed operator uses the new artifact; player history was not restored from a backup.',next:'Observe its real actions. Process or capability failures trigger predecessor rollback.',complete:'The operator release and recovery receipts are retained.',refreshSandbox:false
+  };
+  if(release==='published'&&report.release?.kind==='game_source')return {
+    title:'Verified game source is running in the protected runtime',
+    body:'The exact staged game artifact was published. The host retained the latest acknowledged world and the previous source version.',
+    intent:'Publish a tested game change while preserving player history.',
+    current:'The separate protected game serves this source revision; the current-source Lab remains a baseline.',
+    next:'Observe the protected game. Runtime or history faults trigger recovery using the latest acknowledged checkpoint.',
+    complete:'The source release and recovery receipt are retained.',
+    refreshSandbox:false
+  };
   if(release==='published')return {
     title:'Verified visual data is now in the World Lab',
     body:'The candidate passed the narrow visual-data gate. The Lab will reload the validated visual release; source-code changes remain a retained proposal.',

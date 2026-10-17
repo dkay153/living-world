@@ -8,7 +8,9 @@
   },
   "scripts": {
     "start": "npm run ui:build && node server/index.js",
-    "ui:build": "next build ui",
+    "preview": "npm run ui:build && node scripts/site-preview.js",
+    "preview:login": "node scripts/site-preview.js --login",
+    "ui:build": "next build ui --webpack",
     "test": "npm run ui:build && node scripts/test.js",
     "backup": "node scripts/backup.js",
     "steward:status": "node scripts/steward-status.js",
@@ -19,6 +21,7 @@
     "contracts:check": "node scripts/validate-contracts.js",
     "lab:admin": "npm run ui:build && node scripts/admin-browser-lab.js",
     "lab:micro": "npm run ui:build && node scripts/micro-world-lab.js",
+    "lab:sandbox:prepare": "node scripts/sandbox-prepare.js",
     "lab:full": "npm test && npm run lab:micro"
   },
   "dependencies": {
